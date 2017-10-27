@@ -1,0 +1,7 @@
+.vs/
+EnemyBots/
+Debug/
+Obj/
+*.log
+*.hlt
+*.user
