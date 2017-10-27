@@ -22,6 +22,7 @@ namespace Halite2
                     gameMap.UpdateMap(Networking.ReadLineIntoMetadata());
 
                     foreach (Ship ship in gameMap.GetMyPlayer().GetShips().Values) {
+                        DebugLog.AddLog($"Ship{ship.GetId()}: {ship.GetDockingStatus()}: {ship.GetDockingProgress()}");
                         if (ship.GetDockingStatus() != Ship.DockingStatus.Undocked) {
                             continue;
                         }
@@ -31,15 +32,21 @@ namespace Halite2
                         Planet closestPlanet = null;
                         double closestPlanetDistance = Double.MaxValue;
                         foreach (Planet planet in gameMap.GetAllPlanets().Values) {
-                            if (planet.IsOwned()) {
+                            // Fill up the planet first.
+                            if (planet.IsOwned() && !planet.IsOwnedBy(gameMap.GetMyPlayerId())) {
                                 continue;
                             }
 
-                            if (ship.CanDock(planet)) {
-                                moveList.Add(new DockMove(ship, planet));
-                                moveMade = true;
-                                break;
+                            if (ship.CanDock(planet) && !planet.IsFull()) {
+                                DebugLog.AddLog($"{planet.GetId()}; {planet.GetDockingSpots()}: {planet.GetDockedShips().Count}");
+                                    moveList.Add(new DockMove(ship, planet));
+                                    moveMade = true;
+                                    break;
                             }
+
+                            // Now find closest unowned planet.
+                            if(planet.IsOwned())
+                                continue;
 
                             var distance = planet.GetDistanceTo(ship);
                             if (distance < closestPlanetDistance) {
@@ -48,7 +55,10 @@ namespace Halite2
                             }
                         }
 
-                        if (closestPlanet != null && !moveMade) {
+                        if(moveMade)
+                            continue;
+
+                        if (closestPlanet != null) {
                             ThrustMove newThrustMove =
                                 Navigation.NavigateShipToDock(gameMap, ship, closestPlanet, Constants.MAX_SPEED);
                             if (newThrustMove != null) {
@@ -57,6 +67,7 @@ namespace Halite2
                             }
                         }
 
+                        // There are no unowned planet, just attack the other player's planets.
                         if (gameMap.GetAllPlanets().Values.All(p => p.IsOwned())) {
                             closestPlanetDistance = Double.MaxValue;
                             closestPlanet = null;
