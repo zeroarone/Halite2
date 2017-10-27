@@ -42,7 +42,6 @@ namespace Halite2
                             }
 
                             var distance = planet.GetDistanceTo(ship);
-                            DebugLog.AddLog($"Distance to planet: {distance}");
                             if (distance < closestPlanetDistance) {
                                 closestPlanet = planet;
                                 closestPlanetDistance = distance;
@@ -50,7 +49,6 @@ namespace Halite2
                         }
 
                         if (closestPlanet != null && !moveMade) {
-                            DebugLog.AddLog($"Moving toward closest planet.");
                             ThrustMove newThrustMove =
                                 Navigation.NavigateShipToDock(gameMap, ship, closestPlanet, Constants.MAX_SPEED);
                             if (newThrustMove != null) {
@@ -59,20 +57,30 @@ namespace Halite2
                             }
                         }
 
-                        if (gameMap.GetAllPlanets().Values.All(p => p.IsOwned()))
-                            foreach (Planet planet in gameMap.GetAllPlanets().Values
-                                .Where(p => !p.IsOwnedBy(gameMap.GetMyPlayer().GetId()))) {
-                                ThrustMove newThrustMove = Navigation.NavigateShipTowardsTarget(gameMap, ship,
-                                    planet, Constants.MAX_SPEED, false, Constants.MAX_NAVIGATION_CORRECTIONS,
+                        if (gameMap.GetAllPlanets().Values.All(p => p.IsOwned())) {
+                            closestPlanetDistance = Double.MaxValue;
+                            closestPlanet = null;
+                            foreach (Planet planet in gameMap.GetAllPlanets().Values.Where(p => !p.IsOwnedBy(gameMap.GetMyPlayer().GetId())))
+                            {
+                                var distance = planet.GetDistanceTo(ship);
+                                if (distance < closestPlanetDistance)
+                                {
+                                    closestPlanet = planet;
+                                    closestPlanetDistance = distance;
+                                }
+                            }
+                            if (closestPlanet != null) {
+                                ThrustMove newThrustMove = Navigation.CrashIntoOpposingPlanets(gameMap, ship,
+                                    closestPlanet, Constants.MAX_SPEED, Constants.MAX_NAVIGATION_CORRECTIONS,
                                     Math.PI / 180.0);
                                 if (newThrustMove != null) {
                                     moveList.Add(newThrustMove);
-                                    break;
                                 }
                             }
+                        }
                     }
 
-                    DebugLog.AddLog(String.Join(",", moveList.Select(m => $"{m.GetShip().GetId()}:{m.GetMoveType()}")));
+                    //DebugLog.AddLog(String.Join(",", moveList.Select(m => $"{m.GetShip().GetId()}:{m.GetMoveType()}")));
 
                     Networking.SendMoves(moveList);
                 }
