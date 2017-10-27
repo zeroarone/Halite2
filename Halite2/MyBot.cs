@@ -1,7 +1,7 @@
 ﻿using System;
-using Halite2.hlt;
 using System.Collections.Generic;
 using System.Linq;
+using Halite2.hlt;
 
 namespace Halite2
 {
@@ -21,8 +21,9 @@ namespace Halite2
                     moveList.Clear();
                     gameMap.UpdateMap(Networking.ReadLineIntoMetadata());
 
+                    var emptyPlanets = gameMap.GetAllPlanets().Values.Any(p => !p.IsOwned());
+
                     foreach (Ship ship in gameMap.GetMyPlayer().GetShips().Values) {
-                        DebugLog.AddLog($"Ship{ship.GetId()}: {ship.GetDockingStatus()}: {ship.GetDockingProgress()}");
                         if (ship.GetDockingStatus() != Ship.DockingStatus.Undocked) {
                             continue;
                         }
@@ -31,14 +32,14 @@ namespace Halite2
 
                         Planet closestPlanet = null;
                         double closestPlanetDistance = Double.MaxValue;
+
                         foreach (Planet planet in gameMap.GetAllPlanets().Values) {
                             // Fill up the planet first.
                             if (planet.IsOwned() && !planet.IsOwnedBy(gameMap.GetMyPlayerId())) {
                                 continue;
                             }
-
-                            if (ship.CanDock(planet) && !planet.IsFull()) {
-                                DebugLog.AddLog($"{planet.GetId()}; {planet.GetDockingSpots()}: {planet.GetDockedShips().Count}");
+                            // Favor spreading out over conquering a single planet until all planets are taken.
+                            if (ship.CanDock(planet) && !planet.IsFull() && (!emptyPlanets || !planet.IsOwned())) {
                                     moveList.Add(new DockMove(ship, planet));
                                     moveMade = true;
                                     break;
