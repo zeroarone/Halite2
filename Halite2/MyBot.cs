@@ -16,12 +16,11 @@ namespace Halite2
                 GameMap gameMap = networking.Initialize(name);
                 
                 List<Move> moveList = new List<Move>();
+                int step = 1;
                 for (;;) {
-                    DebugLog.AddLog("New Move ----------------------------------------------------------------------");
+                    DebugLog.AddLog($"New Move: {step++}----------------------------------------------------------------------");
                     moveList.Clear();
                     gameMap.UpdateMap(Networking.ReadLineIntoMetadata());
-
-                    var emptyPlanets = gameMap.GetAllPlanets().Values.Any(p => !p.IsOwned());
 
                     foreach (Ship ship in gameMap.GetMyPlayer().GetShips().Values) {
                         if (ship.GetDockingStatus() != Ship.DockingStatus.Undocked) {
@@ -38,16 +37,18 @@ namespace Halite2
                             if (planet.IsOwned() && !planet.IsOwnedBy(gameMap.GetMyPlayerId())) {
                                 continue;
                             }
-                            // Favor spreading out over conquering a single planet until all planets are taken.
+                            // Favor conquering a single planet over spreading out.
                             if (ship.CanDock(planet) && !planet.IsFull()) {
+                                    planet.ClaimDockingSpot(ship.GetId());
                                     moveList.Add(new DockMove(ship, planet));
                                     moveMade = true;
                                     break;
                             }
 
-                            // Now find closest unowned planet.
-                            if(planet.IsOwned())
+                            // Don't try to go toward an already full planet.
+                            if(planet.IsFull()){
                                 continue;
+                            }
 
                             var distance = planet.GetDistanceTo(ship);
                             if (distance < closestPlanetDistance) {
@@ -59,16 +60,21 @@ namespace Halite2
                         if(moveMade)
                             continue;
 
+                        DebugLog.AddLog($"{ship}{closestPlanet}");
+
                         if (closestPlanet != null) {
                             ThrustMove newThrustMove =
                                 Navigation.NavigateShipToDock(gameMap, ship, closestPlanet, Constants.MAX_SPEED);
                             if (newThrustMove != null) {
+                                DebugLog.AddLog("Thrusting toward closestPlanet");
+                                // Claim the docking spot, so we don't send more ships than needed toward an empty planet.
+                                closestPlanet.ClaimDockingSpot(ship.GetId());
                                 moveList.Add(newThrustMove);
                                 continue;
                             }
                         }
 
-                        // There are no unowned planet, just attack the other player's planets.
+                        // There are no unowned planets, or we've already claimed them all, just attack the other player's planets.
                         if (gameMap.GetAllPlanets().Values.All(p => p.IsOwned())) {
                             closestPlanetDistance = Double.MaxValue;
                             closestPlanet = null;
@@ -99,8 +105,9 @@ namespace Halite2
                                 }
 
                                 DebugLog.AddLog($"{closestShipDistance}:{ship.GetRadius()}:{Math.Min(Constants.MAX_SPEED, (int)Math.Floor(closestShipDistance - ship.GetRadius()))}");
+                                DebugLog.AddLog(closestShip.ToString());
                                 ThrustMove newThrustMove = Navigation.NavigateShipTowardsTarget(gameMap, ship,
-                                    closestShip, Math.Min(Constants.MAX_SPEED, (int)Math.Floor(Math.Max(closestShipDistance - ship.GetRadius() - 1, 0))), true, Constants.MAX_NAVIGATION_CORRECTIONS,
+                                    closestShip, Math.Min(Constants.MAX_SPEED, (int)Math.Floor(Math.Max(closestShipDistance - ship.GetRadius() - 1, 1))), true, Constants.MAX_NAVIGATION_CORRECTIONS,
                                     Math.PI / 180.0);
                                 if (newThrustMove != null) {
                                     moveList.Add(newThrustMove);
@@ -108,8 +115,6 @@ namespace Halite2
                             }
                         }
                     }
-
-                    //DebugLog.AddLog(String.Join(",", moveList.Select(m => $"{m.GetShip().GetId()}:{m.GetMoveType()}")));
 
                     Networking.SendMoves(moveList);
                 }

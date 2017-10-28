@@ -16,7 +16,7 @@ namespace Halite2.hlt {
             this.dockingSpots = dockingSpots;
             this.currentProduction = currentProduction;
             this.remainingProduction = remainingProduction;
-            this.dockedShips = dockedShips.AsReadOnly();
+            this.dockedShips = dockedShips;
         }
 
         public int RemainingProduction => remainingProduction;
@@ -35,6 +35,10 @@ namespace Halite2.hlt {
 
         public bool IsFull() {
             return dockedShips.Count == dockingSpots;
+        }
+
+        public void ClaimDockingSpot(int entity){
+            dockedShips.Add(entity);
         }
 
         public bool IsOwned() {
