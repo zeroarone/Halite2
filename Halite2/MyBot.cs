@@ -75,10 +75,13 @@ namespace Halite2
                         }
 
                         // There are no unowned planets, or we've already claimed them all, just attack the other player's planets.
-                        if (gameMap.GetAllPlanets().Values.All(p => p.IsOwned())) {
+                        var allOwned = gameMap.GetAllPlanets().Values.All(p => p.IsOwned());
+                        var allClaimed = gameMap.GetAllPlanets().Where(p => p.Value.IsOwnedBy(gameMap.GetMyPlayerId())).All(p => p.Value.IsFull());
+                        if (allOwned || allClaimed) {
+                            DebugLog.AddLog($"{allOwned}:{allClaimed}");
                             closestPlanetDistance = Double.MaxValue;
                             closestPlanet = null;
-                            foreach (Planet planet in gameMap.GetAllPlanets().Values.Where(p => !p.IsOwnedBy(gameMap.GetMyPlayer().GetId())))
+                            foreach (Planet planet in gameMap.GetAllPlanets().Values.Where(p => p.IsOwned() && !p.IsOwnedBy(gameMap.GetMyPlayer().GetId())))
                             {
                                 var distance = planet.GetDistanceTo(ship);
                                 if (distance < closestPlanetDistance)
