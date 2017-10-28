@@ -10,6 +10,7 @@ namespace Halite2.hlt {
         private List<Player> players;
         private IList<Player> playersUnmodifiable;
         private Dictionary<int, Planet> planets;
+        Dictionary<int, Ship> ships;
         private List<Ship> allShips;
         private IList<Ship> allShipsUnmodifiable;
 
@@ -47,6 +48,10 @@ namespace Halite2.hlt {
 
         public Ship GetShip(int playerId, int entityId) {
             return players[playerId].GetShip(entityId);
+        }
+
+        public Ship GetShip(int entityId){
+            return ships[entityId];
         }
 
         public Planet GetPlanet(int entityId) {
@@ -126,6 +131,8 @@ namespace Halite2.hlt {
                 }
                 players.Add(currentPlayer);
             }
+
+            ships = allShips.ToDictionary(s => s.GetId());
 
             int numberOfPlanets = int.Parse(mapMetadata.Pop());
 

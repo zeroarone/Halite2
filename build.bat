@@ -1,0 +1,1 @@
+dotnet build Halite2/Halite2.csproj

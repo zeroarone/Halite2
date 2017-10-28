@@ -5,3 +5,4 @@ Obj/
 *.log
 *.hlt
 *.user
+.vscode/

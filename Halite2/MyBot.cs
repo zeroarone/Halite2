@@ -82,8 +82,25 @@ namespace Halite2
                                 }
                             }
                             if (closestPlanet != null) {
-                                ThrustMove newThrustMove = Navigation.CrashIntoOpposingPlanets(gameMap, ship,
-                                    closestPlanet, Constants.MAX_SPEED, Constants.MAX_NAVIGATION_CORRECTIONS,
+                                var closestShipDistance = Double.MaxValue;
+                                Ship closestShip = null;
+                                foreach (var dockedShip in closestPlanet.GetDockedShips().Select(s => gameMap.GetShip(s)))
+                                {
+                                    var shipDistance = ship.GetDistanceTo(dockedShip);
+                                    if(shipDistance < closestShipDistance){
+                                        closestShipDistance = shipDistance;
+                                        closestShip = dockedShip;
+                                    }
+                                }
+
+                                if(closestShipDistance < ship.GetRadius()){
+                                    moveList.Add(new Move(Move.MoveType.Noop, ship));
+                                    continue;
+                                }
+
+                                DebugLog.AddLog($"{closestShipDistance}:{ship.GetRadius()}:{Math.Min(Constants.MAX_SPEED, (int)Math.Floor(closestShipDistance - ship.GetRadius()))}");
+                                ThrustMove newThrustMove = Navigation.NavigateShipTowardsTarget(gameMap, ship,
+                                    closestShip, Math.Min(Constants.MAX_SPEED, (int)Math.Floor(Math.Max(closestShipDistance - ship.GetRadius() - 1, 0))), true, Constants.MAX_NAVIGATION_CORRECTIONS,
                                     Math.PI / 180.0);
                                 if (newThrustMove != null) {
                                     moveList.Add(newThrustMove);
