@@ -39,7 +39,7 @@ namespace Halite2
                                 continue;
                             }
                             // Favor spreading out over conquering a single planet until all planets are taken.
-                            if (ship.CanDock(planet) && !planet.IsFull() && (!emptyPlanets || !planet.IsOwned())) {
+                            if (ship.CanDock(planet) && !planet.IsFull()) {
                                     moveList.Add(new DockMove(ship, planet));
                                     moveMade = true;
                                     break;
