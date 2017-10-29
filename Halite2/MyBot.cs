@@ -168,7 +168,7 @@ namespace Halite2
             }
 
             ThrustMove newThrustMove = Navigation.NavigateShipTowardsTarget(map, ship,
-                closestShip, Math.Min(Constants.MAX_SPEED, (int)Math.Floor(Math.Max(closestShipDistance - ship.GetRadius() - 1, 1))), true, Constants.MAX_NAVIGATION_CORRECTIONS,
+                closestShip, Math.Min(Constants.MAX_SPEED, (int)Math.Floor(Math.Max(closestShipDistance - ship.GetRadius() - 1, 0))), true, Constants.MAX_NAVIGATION_CORRECTIONS,
                 Math.PI / 180.0);
             if (newThrustMove != null) {
                 moveList.Add(newThrustMove);
