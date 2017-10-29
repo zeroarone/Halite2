@@ -29,10 +29,16 @@ namespace Halite2
                     foreach(Planet planet in gameMap.GetAllPlanets().Select(kvp => kvp.Value)){
                         if(planet.IsOwnedBy(gameMap.GetMyPlayerId())){
                             ownedPlanets.Add(planet);
-                            planet.NearbyEnemies = gameMap.NearbyEntitiesByDistance(planet).Where(e => e.Value.GetType() == typeof(Ship) && e.Value.GetOwner() != gameMap.GetMyPlayerId() && e.Key < Constants.SHIP_RADIUS + 1).OrderBy(kvp => kvp.Key).ToList();
+                            var dockedShips = planet.GetDockedShips().Select(s => gameMap.GetShip(s));
+                            planet.NearbyEnemies = new List<KeyValuePair<double, Entity>>();
+                            foreach(var ship in dockedShips){
+                                planet.NearbyEnemies.AddRange(gameMap.NearbyEntitiesByDistance(ship).Where(e => e.Value.GetType() == typeof(Ship) && e.Value.GetOwner() != gameMap.GetMyPlayerId() && e.Key < Constants.SHIP_RADIUS + 1).OrderBy(kvp => kvp.Key));                                
+                            }
+                            planet.NearbyEnemies.Sort((kvp1, kvp2) => kvp1.Key.CompareTo(kvp2.Key));
+                            
                             if(planet.NearbyEnemies.Count > 0){
                                 DebugLog.AddLog("Found attacking enemies, defending.");
-                                beingAttacked.Add(planet, planet.NearbyEnemies.Count);
+                                beingAttacked.Add(planet, planet.NearbyEnemies.Count * 2);
                             }
                         }
                         else{
@@ -63,7 +69,12 @@ namespace Halite2
                                         // Probably defending?
                                         NavigateToDefend(new Dictionary<Planet, int>{{planet, 0}}, planet, null, null, moveList, gameMap, false, realShip);
                                     }
-                                    NavigateToDock(null, planet, null, null, moveList, gameMap, false, realShip);
+                                    else if(planet.GetDockedShips().Count() < planet.GetDockingSpots()){
+                                        NavigateToDock(null, planet, null, null, moveList, gameMap, false, realShip);
+                                    }
+                                    else{
+                                        toRemove.Add(ship);
+                                    }
                                 }
                                 else{
                                     NavigateToAttack(null, planet, null, null, moveList, gameMap, false, realShip);
@@ -73,6 +84,12 @@ namespace Halite2
                         }
                         foreach(var ship in toRemove){
                             kvp.Value.Remove(ship);
+                        }
+                    }
+                    // TODO: Fix bug that causes ships to all try to dock to one planet.
+                    foreach(var planet in gameMap.GetAllPlanets()){
+                        if(planet.Value.GetDockedShips().Count() > planet.Value.GetDockingSpots()){                            
+                            Planet.ShipsClaimed[planet.Key] = new List<Ship>();            
                         }
                     }
                     ownedPlanets.Sort(PlanetComparer);
@@ -97,6 +114,7 @@ namespace Halite2
             var attackedPlanet = beingAttacked.FirstOrDefault(kvp => kvp.Value > 0);
             if(attackedPlanet.Key != null){
                 NavigateToDefend(beingAttacked, attackedPlanet.Key, ownedPlanets, unOwnedPlanets, moveList, map);
+                return;
             }
 
             // Fill up already owned planets first.
@@ -176,19 +194,19 @@ namespace Halite2
 
             if(closestShipDistance < ship.GetRadius()){
                 moveList.Add(new Move(Move.MoveType.Noop, ship));
-                return;
             }
-
-            ThrustMove newThrustMove = Navigation.NavigateShipTowardsTarget(map, ship,
-                closestShip, Math.Min(Constants.MAX_SPEED, (int)Math.Floor(Math.Max(closestShipDistance - ship.GetRadius() - 1, 0))), true, Constants.MAX_NAVIGATION_CORRECTIONS,
-                Math.PI / 180.0);
-            if (newThrustMove != null) {
-                moveList.Add(newThrustMove);
-            }
-            
-            if(makeNextMove){
-                ship.Claim(planetToAttack);
-                MakeNextMove(beingAttacked, ownedPlanets, unOwnedPlanets, moveList, map);
+            else{
+                ThrustMove newThrustMove = Navigation.NavigateShipTowardsTarget(map, ship,
+                    closestShip, Math.Min(Constants.MAX_SPEED, (int)Math.Floor(Math.Max(closestShipDistance - ship.GetRadius() - 1, 0))), true, Constants.MAX_NAVIGATION_CORRECTIONS,
+                    Math.PI / 180.0);
+                if (newThrustMove != null) {
+                    moveList.Add(newThrustMove);
+                }
+                
+                if(makeNextMove){
+                    ship.Claim(planetToAttack);
+                    MakeNextMove(beingAttacked, ownedPlanets, unOwnedPlanets, moveList, map);
+                }
             }
         }
 
@@ -209,14 +227,14 @@ namespace Halite2
 
             if(closestShipDistance < ship.GetRadius()){
                 moveList.Add(new Move(Move.MoveType.Noop, ship));
-                return;
             }
-
-            ThrustMove newThrustMove = Navigation.NavigateShipTowardsTarget(map, ship,
-                closestShip, Math.Min(Constants.MAX_SPEED, (int)Math.Floor(Math.Max(closestShipDistance - ship.GetRadius() - 1, 0))), true, Constants.MAX_NAVIGATION_CORRECTIONS,
-                Math.PI / 180.0);
-            if (newThrustMove != null) {
-                moveList.Add(newThrustMove);
+            else{
+                ThrustMove newThrustMove = Navigation.NavigateShipTowardsTarget(map, ship,
+                    closestShip, Math.Min(Constants.MAX_SPEED, (int)Math.Floor(Math.Max(closestShipDistance - ship.GetRadius() - 1, 0))), true, Constants.MAX_NAVIGATION_CORRECTIONS,
+                    Math.PI / 180.0);
+                if (newThrustMove != null) {
+                    moveList.Add(newThrustMove);
+                }
             }
             
             if(makeNextMove){
