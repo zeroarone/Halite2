@@ -62,6 +62,8 @@ namespace Halite2.hlt {
 
         public List<KeyValuePair<double, Entity>> ShipsByDistance {get;set;}
 
+        public List<KeyValuePair<double, Entity>> NearbyEnemies {get;set;}
+
         public int RemainingProduction => remainingProduction;
 
         public int GetCurrentProduction() {
