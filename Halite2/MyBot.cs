@@ -34,10 +34,35 @@ namespace Halite2
                         }
                         planet.ShipsByDistance = gameMap.NearbyEntitiesByDistance(planet).Where(e => e.Value.GetType() == typeof(Ship) && e.Value.GetOwner() == gameMap.GetMyPlayerId()).OrderBy(kvp => kvp.Key).ToList();
                     }
-                    foreach(Ship ship in gameMap.GetAllShips().Where(s => s.GetDockingStatus() == Ship.DockingStatus.Docking)){
-                        DebugLog.AddLog($"Docked planet: {ship.GetDockedPlanet()}");
-                        gameMap.GetPlanet(ship.GetDockedPlanet()).ClaimDockingSpot(ship.GetId());
+
+                    foreach(var kvp in Planet.ShipsClaimed){
+                        var toRemove = new List<Ship>();
+                        foreach(var ship in kvp.Value){
+                            var realShip = gameMap.GetAllShips().FirstOrDefault(s => s.GetId() == ship.GetId());
+                            if(realShip == null){
+                                toRemove.Add(ship);
+                            }
+                            else{
+                                if(realShip.GetDockingStatus() != Ship.DockingStatus.Undocked)
+                                    continue;
+                                var planet = gameMap.GetPlanet(kvp.Key);
+                                if(!planet.IsOwned() || planet.IsOwnedBy(gameMap.GetMyPlayerId())){
+                                    NavigateToDock(planet, null, null, moveList, gameMap, false, realShip);
+                                }
+                                else{
+                                    NavigateToAttack(planet, null, null, moveList, gameMap, false, realShip);
+                                }
+                                realShip.ClaimStateless();
+                            }
+                        }
+                        foreach(var ship in toRemove){
+                            kvp.Value.Remove(ship);
+                        }
                     }
+                    // foreach(Ship ship in gameMap.GetAllShips().Where(s => s.GetDockingStatus() == Ship.DockingStatus.Docking)){
+                    //     DebugLog.AddLog($"Docked planet: {ship.GetDockedPlanet()}");
+                    //     gameMap.GetPlanet(ship.GetDockedPlanet()).ClaimDockingSpot(ship.GetId());
+                    // }
                     ownedPlanets.Sort(PlanetComparer);
                     unOwnedPlanets.Sort(PlanetComparer);
 
@@ -187,9 +212,11 @@ namespace Halite2
             CalculateMoves(ownedPlanets, unOwnedPlanets, moveList, map);
         }
 
-        private static void NavigateToDock(Planet planetToDock, List<Planet> ownedPlanets, List<Planet> unOwnedPlanets, List<Move> moveList, GameMap map, bool makeNextMove = true){
+        private static void NavigateToDock(Planet planetToDock, List<Planet> ownedPlanets, List<Planet> unOwnedPlanets, List<Move> moveList, GameMap map, bool makeNextMove = true, Ship ship = null){
             DebugLog.AddLog($"Preparing to Dock: {planetToDock.GetId()}, Open Spots: {planetToDock.GetDockingSpots() - planetToDock.GetDockedShips().Count}");
-            var ship = planetToDock.ClosestUnclaimedShip;
+            if(ship == null)
+                ship = planetToDock.ClosestUnclaimedShip;
+
             if(ship == null)
                 return;
 
@@ -206,18 +233,19 @@ namespace Halite2
             }
 
             planetToDock.ClaimDockingSpot(ship.GetId());
-            ship.Claim();
 
-            if(makeNextMove)
+            if(makeNextMove){                
+                ship.Claim(planetToDock);
                 MakeNextMove(ownedPlanets, unOwnedPlanets, moveList, map);
+            }
         }
 
-        private static void NavigateToAttack(Planet planetToAttack, List<Planet> ownedPlanets, List<Planet> unOwnedPlanets, List<Move> moveList, GameMap map){
-            var ship = planetToAttack.ClosestUnclaimedShip;
+        private static void NavigateToAttack(Planet planetToAttack, List<Planet> ownedPlanets, List<Planet> unOwnedPlanets, List<Move> moveList, GameMap map, bool makeNextMove = true, Ship ship = null){
+            if(ship == null)
+                ship = planetToAttack.ClosestUnclaimedShip;
+
             if(ship == null)
                 return;
-
-            ship.Claim();
                 
             var closestShipDistance = Double.MaxValue;
             Ship closestShip = null;
@@ -241,7 +269,10 @@ namespace Halite2
                 moveList.Add(newThrustMove);
             }
             
-            MakeNextMove(ownedPlanets, unOwnedPlanets, moveList, map);
+            if(makeNextMove){
+                ship.Claim(planetToAttack);
+                MakeNextMove(ownedPlanets, unOwnedPlanets, moveList, map);
+            }
         }
     }
 }

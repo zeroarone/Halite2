@@ -59,14 +59,20 @@ namespace Halite2.hlt
                     "]";
         }
 
-        public void Claim(){
+        public void Claim(Planet planet){
             if(!claimed){
+                planet.AddShipClaim(this);
                 DebugLog.AddLog($"Ship: {GetId()} Claimed!");
                 claimed = true;
             }
             else{
                 throw new Exception("Claimed already claimed entity.");
             }
+        }
+
+        public void ClaimStateless(){
+            claimed = true;
+            DebugLog.AddLog($"Ship: {GetId()} Claimed For One Round!");
         }
 
         public bool Claimed{get{return claimed;}}
