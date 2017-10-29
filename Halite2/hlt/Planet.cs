@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Halite2.hlt {
     public class Planet: Entity {
@@ -18,6 +19,32 @@ namespace Halite2.hlt {
             this.remainingProduction = remainingProduction;
             this.dockedShips = dockedShips;
         }
+
+        public double ClosestUnclaimedShipDistance { 
+            get {
+                var distance = ClosestUnclaimedShipAndDistance().Key;
+                return distance == 0 ? double.MaxValue : distance;
+            }
+        }
+
+        public Ship ClosestUnclaimedShip{
+            get{
+                var shipWithDistance = ClosestUnclaimedShipAndDistance();
+                if(shipWithDistance.Key == 0){
+                    return null;
+                }
+                return (Ship)shipWithDistance.Value;
+            }
+        }
+
+        private KeyValuePair<double, Entity> ClosestUnclaimedShipAndDistance(){
+            return ShipsByDistance.FirstOrDefault(s => {
+                    var ship = (Ship)s.Value;
+                    return ship.GetDockingStatus() == Ship.DockingStatus.Undocked && !ship.Claimed;
+                });
+        }
+
+        public List<KeyValuePair<double, Entity>> ShipsByDistance {get;set;}
 
         public int RemainingProduction => remainingProduction;
 

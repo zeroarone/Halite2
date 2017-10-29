@@ -1,3 +1,5 @@
+using System;
+
 namespace Halite2.hlt
 {
     public class Ship : Entity
@@ -8,6 +10,7 @@ namespace Halite2.hlt
         private int dockedPlanet;
         private int dockingProgress;
         private int weaponCooldown;
+        private bool claimed;
 
         public Ship(int owner, int id, double xPos, double yPos,
                     int health, DockingStatus dockingStatus, int dockedPlanet,
@@ -55,5 +58,17 @@ namespace Halite2.hlt
                     ", weaponCooldown=" + weaponCooldown +
                     "]";
         }
+
+        public void Claim(){
+            if(!claimed){
+                DebugLog.AddLog($"Ship: {GetId()} Claimed!");
+                claimed = true;
+            }
+            else{
+                throw new Exception("Claimed already claimed entity.");
+            }
+        }
+
+        public bool Claimed{get{return claimed;}}
     }
 }
