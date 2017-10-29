@@ -35,17 +35,23 @@ namespace Halite2
                         planet.ShipsByDistance = gameMap.NearbyEntitiesByDistance(planet).Where(e => e.Value.GetType() == typeof(Ship) && e.Value.GetOwner() == gameMap.GetMyPlayerId()).OrderBy(kvp => kvp.Key).ToList();
                     }
 
+                    // To prevent wasted movements from ships, if a ship starts toward a planet it will continue to that planet to complete it's mission.
+                    // If the planet is taken over then the bots are no longer "claimed" by it and they can redirect, this happens when we're attacking and in the
+                    // constructor for the planet.
                     foreach(var kvp in Planet.ShipsClaimed){
                         var toRemove = new List<Ship>();
                         foreach(var ship in kvp.Value){
+                            // Make sure the ship is still around.
                             var realShip = gameMap.GetAllShips().FirstOrDefault(s => s.GetId() == ship.GetId());
                             if(realShip == null){
                                 toRemove.Add(ship);
                             }
                             else{
+                                // Don't try to redock docking ships.
                                 if(realShip.GetDockingStatus() != Ship.DockingStatus.Undocked)
                                     continue;
                                 var planet = gameMap.GetPlanet(kvp.Key);
+                                // We own this planet, or it is not owned, so we must have been flying to it to dock, continue doing so.
                                 if(!planet.IsOwned() || planet.IsOwnedBy(gameMap.GetMyPlayerId())){
                                     NavigateToDock(planet, null, null, moveList, gameMap, false, realShip);
                                 }
@@ -59,111 +65,10 @@ namespace Halite2
                             kvp.Value.Remove(ship);
                         }
                     }
-                    // foreach(Ship ship in gameMap.GetAllShips().Where(s => s.GetDockingStatus() == Ship.DockingStatus.Docking)){
-                    //     DebugLog.AddLog($"Docked planet: {ship.GetDockedPlanet()}");
-                    //     gameMap.GetPlanet(ship.GetDockedPlanet()).ClaimDockingSpot(ship.GetId());
-                    // }
                     ownedPlanets.Sort(PlanetComparer);
                     unOwnedPlanets.Sort(PlanetComparer);
 
                     CalculateMoves(ownedPlanets, unOwnedPlanets, moveList, gameMap);
-
-                    // foreach (Ship ship in gameMap.GetMyPlayer().GetShips().Values) {
-                    //     if (ship.GetDockingStatus() != Ship.DockingStatus.Undocked) {
-                    //         continue;
-                    //     }
-
-                    //     var moveMade = false;
-
-                    //     Planet closestPlanet = null;
-                    //     double closestPlanetDistance = Double.MaxValue;
-
-                    //     foreach (Planet planet in gameMap.GetAllPlanets().Values) {
-                    //         // Fill up the planet first.
-                    //         if (planet.IsOwned() && !planet.IsOwnedBy(gameMap.GetMyPlayerId())) {
-                    //             continue;
-                    //         }
-                    //         // Favor conquering a single planet over spreading out.
-                    //         if (ship.CanDock(planet) && !planet.IsFull()) {
-                    //                 planet.ClaimDockingSpot(ship.GetId());
-                    //                 moveList.Add(new DockMove(ship, planet));
-                    //                 moveMade = true;
-                    //                 break;
-                    //         }
-
-                    //         // Don't try to go toward an already full planet.
-                    //         if(planet.IsFull()){
-                    //             continue;
-                    //         }
-
-                    //         var distance = planet.GetDistanceTo(ship);
-                    //         if (distance < closestPlanetDistance) {
-                    //             closestPlanet = planet;
-                    //             closestPlanetDistance = distance;
-                    //         }
-                    //     }
-
-                    //     if(moveMade)
-                    //         continue;
-
-                    //     DebugLog.AddLog($"{ship}{closestPlanet}");
-
-                    //     if (closestPlanet != null) {
-                    //         ThrustMove newThrustMove =
-                    //             Navigation.NavigateShipToDock(gameMap, ship, closestPlanet, Constants.MAX_SPEED);
-                    //         if (newThrustMove != null) {
-                    //             DebugLog.AddLog("Thrusting toward closestPlanet");
-                    //             // Claim the docking spot, so we don't send more ships than needed toward an empty planet.
-                    //             closestPlanet.ClaimDockingSpot(ship.GetId());
-                    //             moveList.Add(newThrustMove);
-                    //             continue;
-                    //         }
-                    //     }
-
-                    //     // There are no unowned planets, or we've already claimed them all, just attack the other player's planets.
-                    //     var allOwned = gameMap.GetAllPlanets().Values.All(p => p.IsOwned());
-                    //     var allClaimed = gameMap.GetAllPlanets().Where(p => p.Value.IsOwnedBy(gameMap.GetMyPlayerId())).All(p => p.Value.IsFull());
-                    //     if (allOwned || allClaimed) {
-                    //         DebugLog.AddLog($"{allOwned}:{allClaimed}");
-                    //         closestPlanetDistance = Double.MaxValue;
-                    //         closestPlanet = null;
-                    //         foreach (Planet planet in gameMap.GetAllPlanets().Values.Where(p => p.IsOwned() && !p.IsOwnedBy(gameMap.GetMyPlayer().GetId())))
-                    //         {
-                    //             var distance = planet.GetDistanceTo(ship);
-                    //             if (distance < closestPlanetDistance)
-                    //             {
-                    //                 closestPlanet = planet;
-                    //                 closestPlanetDistance = distance;
-                    //             }
-                    //         }
-                    //         if (closestPlanet != null) {
-                    //             var closestShipDistance = Double.MaxValue;
-                    //             Ship closestShip = null;
-                    //             foreach (var dockedShip in closestPlanet.GetDockedShips().Select(s => gameMap.GetShip(s)))
-                    //             {
-                    //                 var shipDistance = ship.GetDistanceTo(dockedShip);
-                    //                 if(shipDistance < closestShipDistance){
-                    //                     closestShipDistance = shipDistance;
-                    //                     closestShip = dockedShip;
-                    //                 }
-                    //             }
-
-                    //             if(closestShipDistance < ship.GetRadius()){
-                    //                 moveList.Add(new Move(Move.MoveType.Noop, ship));
-                    //                 continue;
-                    //             }
-
-                    //             DebugLog.AddLog($"{closestShipDistance}:{ship.GetRadius()}:{Math.Min(Constants.MAX_SPEED, (int)Math.Floor(closestShipDistance - ship.GetRadius()))}");
-                    //             DebugLog.AddLog(closestShip.ToString());
-                    //             ThrustMove newThrustMove = Navigation.NavigateShipTowardsTarget(gameMap, ship,
-                    //                 closestShip, Math.Min(Constants.MAX_SPEED, (int)Math.Floor(Math.Max(closestShipDistance - ship.GetRadius() - 1, 1))), true, Constants.MAX_NAVIGATION_CORRECTIONS,
-                    //                 Math.PI / 180.0);
-                    //             if (newThrustMove != null) {
-                    //                 moveList.Add(newThrustMove);
-                    //             }
-                    //         }
-                    //     }
-                    // }
 
                     Networking.SendMoves(moveList);
                 }
