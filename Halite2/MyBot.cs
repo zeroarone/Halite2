@@ -46,52 +46,7 @@ namespace Halite2
                         }
                         planet.ShipsByDistance = gameMap.NearbyEntitiesByDistance(planet).Where(e => e.Value.GetType() == typeof(Ship) && e.Value.GetOwner() == gameMap.GetMyPlayerId()).OrderBy(kvp => kvp.Key).ToList();
                     }
-
-                    // To prevent wasted movements from ships, if a ship starts toward a planet it will continue to that planet to complete it's mission.
-                    // If the planet is taken over then the bots are no longer "claimed" by it and they can redirect, this happens when we're attacking and in the
-                    // constructor for the planet.
-                    foreach(var kvp in Planet.ShipsClaimed){
-                        var toRemove = new List<Ship>();
-                        foreach(var ship in kvp.Value){
-                            // Make sure the ship is still around.
-                            var realShip = gameMap.GetAllShips().FirstOrDefault(s => s.GetId() == ship.GetId());
-                            if(realShip == null){
-                                toRemove.Add(ship);
-                            }
-                            else{
-                                // Don't try to redock docking ships.
-                                if(realShip.GetDockingStatus() != Ship.DockingStatus.Undocked)
-                                    continue;
-                                var planet = gameMap.GetPlanet(kvp.Key);
-                                // We own this planet, or it is not owned, so we must have been flying to it to dock, continue doing so.
-                                if(!planet.IsOwned() || planet.IsOwnedBy(gameMap.GetMyPlayerId())){
-                                    if(planet.IsOwnedBy(gameMap.GetMyPlayerId()) && planet.NearbyEnemies.Count > 0){
-                                        // Probably defending?
-                                        NavigateToDefend(new Dictionary<Planet, int>{{planet, 0}}, planet, null, null, moveList, gameMap, false, realShip);
-                                    }
-                                    else if(planet.GetDockedShips().Count() < planet.GetDockingSpots()){
-                                        NavigateToDock(null, planet, null, null, moveList, gameMap, false, realShip);
-                                    }
-                                    else{
-                                        toRemove.Add(ship);
-                                    }
-                                }
-                                else{
-                                    NavigateToAttack(null, planet, null, null, moveList, gameMap, false, realShip);
-                                }
-                                realShip.ClaimStateless();
-                            }
-                        }
-                        foreach(var ship in toRemove){
-                            kvp.Value.Remove(ship);
-                        }
-                    }
-                    // TODO: Fix bug that causes ships to all try to dock to one planet.
-                    foreach(var planet in gameMap.GetAllPlanets()){
-                        if(planet.Value.GetDockedShips().Count() > planet.Value.GetDockingSpots()){                            
-                            Planet.ShipsClaimed[planet.Key] = new List<Ship>();            
-                        }
-                    }
+                    
                     ownedPlanets.Sort(PlanetComparer);
                     unOwnedPlanets.Sort(PlanetComparer);
 

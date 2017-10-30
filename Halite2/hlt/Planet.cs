@@ -8,8 +8,6 @@ namespace Halite2.hlt {
         private int currentProduction;
         private int dockingSpots;
         private IList<int> dockedShips;
-        private static Dictionary<int, List<Ship>> shipsClaimed = new Dictionary<int, List<Ship>>();
-        private static Dictionary<int, bool> ownedPreviousRound = new Dictionary<int, bool>();
 
         public Planet(int owner, int id, double xPos, double yPos, int health,
                       double radius, int dockingSpots, int currentProduction,
@@ -20,17 +18,7 @@ namespace Halite2.hlt {
             this.currentProduction = currentProduction;
             this.remainingProduction = remainingProduction;
             this.dockedShips = dockedShips;
-            if(!shipsClaimed.ContainsKey(id)){
-                shipsClaimed.Add(id, new List<Ship>());
-            }
-            // Clear out the claimed ships, we need to start over on the claims.
-            if(ownedPreviousRound.ContainsKey(id) && ownedPreviousRound[id] && owner == 0){
-                shipsClaimed[id] = new List<Ship>();
-            }
-            ownedPreviousRound[id] = owner != 0;
         }
-
-        public static Dictionary<int,List<Ship>> ShipsClaimed => shipsClaimed;
 
         public double ClosestUnclaimedShipDistance { 
             get {
@@ -54,10 +42,6 @@ namespace Halite2.hlt {
                     var ship = (Ship)s.Value;
                     return ship.GetDockingStatus() == Ship.DockingStatus.Undocked && !ship.Claimed;
                 });
-        }
-
-        public void AddShipClaim(Ship ship){
-            shipsClaimed[GetId()].Add(ship);
         }
 
         public List<KeyValuePair<double, Entity>> ShipsByDistance {get;set;}
