@@ -47,8 +47,10 @@ namespace Halite2.hlt {
             return players[playerId].GetShip(entityId);
         }
 
-        public Ship GetShip(int entityId){
-            return ships[entityId];
+        public Ship GetShip(int entityId) {
+            Ship ship;
+            ships.TryGetValue(entityId, out ship);
+            return ship;
         }
 
         public Planet GetPlanet(int entityId) {

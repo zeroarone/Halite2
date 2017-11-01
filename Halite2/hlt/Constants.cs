@@ -45,6 +45,8 @@ namespace Halite2.hlt
         /** Distance from the planets edge at which new ships are created */
         public static double SPAWN_RADIUS = 2.0;
 
+        public static double DEFEND_DISTANCE = 5.0;
+
         ////////////////////////////////////////////////////////////////////////
         // Implementation-specific constants
 

@@ -50,6 +50,7 @@ namespace Halite2.hlt {
         public List<KeyValuePair<Entity, Double>> NearbyEnemies {get;set;}
 
         public int RemainingProduction => remainingProduction;
+        public Ship DefendingShip { get; set; }
 
         public int GetCurrentProduction() {
             return currentProduction;
