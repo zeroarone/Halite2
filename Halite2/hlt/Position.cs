@@ -60,14 +60,13 @@ namespace Halite2.hlt {
             
             Position position = (Position)o;
 
-            if (position == null)
-                return false;
-
             return Equals(position.xPos, xPos) && Equals(position.yPos, yPos);
         }
 
         public override int GetHashCode() {
-            return base.GetHashCode();
+            unchecked {
+                return (xPos.GetHashCode() * 397) ^ yPos.GetHashCode();
+            }
         }
 
         public override string ToString() {

@@ -61,7 +61,6 @@ namespace Halite2.hlt
 
         public void Claim(Planet planet){
             if(!claimed){
-                planet.AddShipClaim(this);
                 DebugLog.AddLog($"Ship: {GetId()} Claimed!");
                 claimed = true;
             }

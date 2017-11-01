@@ -6,7 +6,6 @@ namespace Halite2.hlt {
 
     public class GameMap {
         private int width, height;
-        private int playerId;
         private List<Player> players;
         private IList<Player> playersUnmodifiable;
         private Dictionary<int, Planet> planets;
@@ -20,7 +19,7 @@ namespace Halite2.hlt {
         public GameMap(int width, int height, int playerId) {
             this.width = width;
             this.height = height;
-            this.playerId = playerId;
+            this.MyPlayerId = playerId;
             players = new List<Player>(Constants.MAX_PLAYERS);
             playersUnmodifiable = players.AsReadOnly();
             planets = new Dictionary<int, Planet>();
@@ -36,15 +35,13 @@ namespace Halite2.hlt {
             return width;
         }
 
-        public int GetMyPlayerId() {
-            return playerId;
-        }
+        public int MyPlayerId { get; }
 
         public IList<Player> GetAllPlayers() {
             return playersUnmodifiable;
         }
 
-        public Player GetMyPlayer() => playersUnmodifiable[GetMyPlayerId()];
+        public Player GetMyPlayer() => playersUnmodifiable[MyPlayerId];
 
         public Ship GetShip(int playerId, int entityId) {
             return players[playerId].GetShip(entityId);
@@ -89,21 +86,21 @@ namespace Halite2.hlt {
             }
         }
 
-        public Dictionary<double, Entity> NearbyEntitiesByDistance(Entity entity) {
-            Dictionary<double, Entity> entityByDistance = new Dictionary<double, Entity>();
+        public Dictionary<Entity, double> NearbyEntitiesByDistance(Entity entity) {
+            Dictionary<Entity, double> entityByDistance = new Dictionary<Entity, double>();
 
             foreach (Planet planet in planets.Values) {
                 if (planet.Equals(entity)) {
                     continue;
                 }
-                entityByDistance[entity.GetDistanceTo(planet)] = planet;
+                entityByDistance[planet] = entity.GetDistanceTo(planet);
             }
 
             foreach (Ship ship in allShips) {
                 if (ship.Equals(entity)) {
                     continue;
                 }
-                entityByDistance[entity.GetDistanceTo(ship)] = ship;
+                entityByDistance[ship] = entity.GetDistanceTo(ship);
             }
 
             return entityByDistance;
