@@ -33,7 +33,7 @@ namespace Halite2
                             foreach(var ship in dockedShips){
                                 planet.NearbyEnemies.AddRange(gameMap.NearbyEntitiesByDistance(ship).Where(e => e.Key.GetType() == typeof(Ship) && e.Key.GetOwner() != gameMap.MyPlayerId && e.Value < Constants.SHIP_RADIUS + 1).OrderBy(kvp => kvp.Value));                                
                             }
-                            planet.NearbyEnemies.Sort((kvp1, kvp2) => kvp1.Value.CompareTo(kvp2.Key));
+                            planet.NearbyEnemies.Sort((kvp1, kvp2) => kvp1.Value.CompareTo(kvp2.Value));
                             
                             if(planet.NearbyEnemies.Count > 0){
                                 DebugLog.AddLog("Found attacking enemies, defending.");
