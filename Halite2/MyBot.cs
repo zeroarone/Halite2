@@ -22,13 +22,12 @@ namespace Halite2
                     moveList.Clear();
                     gameMap.UpdateMap(Networking.ReadLineIntoMetadata());
 
-                    List<Planet> ownedPlanets = new List<Planet>();
-                    List<Planet> unOwnedPlanets = new List<Planet>();
+                    List<Planet> sortedPlanets = new List<Planet>();
                     Dictionary<Planet, int> beingAttacked = new Dictionary<Planet, int>();
 
                     foreach(Planet planet in gameMap.GetAllPlanets().Select(kvp => kvp.Value)){
+                        sortedPlanets.Add(planet);
                         if(planet.IsOwnedBy(gameMap.GetMyPlayerId())){
-                            ownedPlanets.Add(planet);
                             var dockedShips = planet.GetDockedShips().Select(s => gameMap.GetShip(s));
                             planet.NearbyEnemies = new List<KeyValuePair<double, Entity>>();
                             foreach(var ship in dockedShips){
@@ -41,61 +40,10 @@ namespace Halite2
                                 beingAttacked.Add(planet, planet.NearbyEnemies.Count * 2);
                             }
                         }
-                        else{
-                            unOwnedPlanets.Add(planet);
-                        }
                         planet.ShipsByDistance = gameMap.NearbyEntitiesByDistance(planet).Where(e => e.Value.GetType() == typeof(Ship) && e.Value.GetOwner() == gameMap.GetMyPlayerId()).OrderBy(kvp => kvp.Key).ToList();
                     }
 
-                    // To prevent wasted movements from ships, if a ship starts toward a planet it will continue to that planet to complete it's mission.
-                    // If the planet is taken over then the bots are no longer "claimed" by it and they can redirect, this happens when we're attacking and in the
-                    // constructor for the planet.
-                    foreach(var kvp in Planet.ShipsClaimed){
-                        var toRemove = new List<Ship>();
-                        foreach(var ship in kvp.Value){
-                            // Make sure the ship is still around.
-                            var realShip = gameMap.GetAllShips().FirstOrDefault(s => s.GetId() == ship.GetId());
-                            if(realShip == null){
-                                toRemove.Add(ship);
-                            }
-                            else{
-                                // Don't try to redock docking ships.
-                                if(realShip.GetDockingStatus() != Ship.DockingStatus.Undocked)
-                                    continue;
-                                var planet = gameMap.GetPlanet(kvp.Key);
-                                // We own this planet, or it is not owned, so we must have been flying to it to dock, continue doing so.
-                                if(!planet.IsOwned() || planet.IsOwnedBy(gameMap.GetMyPlayerId())){
-                                    if(planet.IsOwnedBy(gameMap.GetMyPlayerId()) && planet.NearbyEnemies.Count > 0){
-                                        // Probably defending?
-                                        NavigateToDefend(new Dictionary<Planet, int>{{planet, 0}}, planet, null, null, moveList, gameMap, false, realShip);
-                                    }
-                                    else if(planet.GetDockedShips().Count() < planet.GetDockingSpots()){
-                                        NavigateToDock(null, planet, null, null, moveList, gameMap, false, realShip);
-                                    }
-                                    else{
-                                        toRemove.Add(ship);
-                                    }
-                                }
-                                else{
-                                    NavigateToAttack(null, planet, null, null, moveList, gameMap, false, realShip);
-                                }
-                                realShip.ClaimStateless();
-                            }
-                        }
-                        foreach(var ship in toRemove){
-                            kvp.Value.Remove(ship);
-                        }
-                    }
-                    // TODO: Fix bug that causes ships to all try to dock to one planet.
-                    foreach(var planet in gameMap.GetAllPlanets()){
-                        if(planet.Value.GetDockedShips().Count() > planet.Value.GetDockingSpots()){                            
-                            Planet.ShipsClaimed[planet.Key] = new List<Ship>();            
-                        }
-                    }
-                    ownedPlanets.Sort(PlanetComparer);
-                    unOwnedPlanets.Sort(PlanetComparer);
-
-                    CalculateMoves(beingAttacked, ownedPlanets, unOwnedPlanets, moveList, gameMap);
+                    MakeNextMove(beingAttacked, sortedPlanets, moveList, gameMap);
 
                     Networking.SendMoves(moveList);
                 }
@@ -109,44 +57,36 @@ namespace Halite2
         private static int PlanetComparer(Planet p1, Planet p2) => p1.ClosestUnclaimedShipDistance.CompareTo(p2.ClosestUnclaimedShipDistance);
 
         private static double percentToConquer = .8;
-        private static void CalculateMoves (Dictionary<Planet, int> beingAttacked, List<Planet> ownedPlanets, List<Planet> unOwnedPlanets, List<Move> moveList, GameMap map){
+        private static void CalculateMoves (Dictionary<Planet, int> beingAttacked, List<Planet> sortedPlanets, List<Move> moveList, GameMap map){
             // Defend
             var attackedPlanet = beingAttacked.FirstOrDefault(kvp => kvp.Value > 0);
             if(attackedPlanet.Key != null){
-                NavigateToDefend(beingAttacked, attackedPlanet.Key, ownedPlanets, unOwnedPlanets, moveList, map);
+                NavigateToDefend(beingAttacked, attackedPlanet.Key, sortedPlanets, moveList, map);
                 return;
             }
 
-            // Fill up already owned planets first.
-            var unfilledPlanet = ownedPlanets.FirstOrDefault(p => !p.IsFull());
-            if(unfilledPlanet != null){
-                DebugLog.AddLog($"Unfilled: {unfilledPlanet.GetId()}");
-                NavigateToDock(beingAttacked, unfilledPlanet, ownedPlanets, unOwnedPlanets, moveList, map);
+            // Try to fill up our planets or capture unowned planets.
+            var planetToDock = sortedPlanets.FirstOrDefault(p => (!p.IsOwned() || p.IsOwnedBy(map.GetMyPlayerId())) && !p.IsFull());
+            if(planetToDock != null){
+                DebugLog.AddLog($"PlanetToDock: {planetToDock.GetId()} : {planetToDock.ClosestUnclaimedShipDistance}");
+
+                NavigateToDock(beingAttacked, planetToDock, sortedPlanets, moveList, map);
                 return;
             }
 
-            // Try to capture unowned planets next.
-            var emptyPlanet = unOwnedPlanets.FirstOrDefault(p => !p.IsOwned() && !p.IsFull());
-            if(emptyPlanet != null){
-                DebugLog.AddLog($"Empty: {emptyPlanet.GetId()}");
-                NavigateToDock(beingAttacked, emptyPlanet, ownedPlanets, unOwnedPlanets, moveList, map);
-                return;
-            }
-
-            var planet = unOwnedPlanets.FirstOrDefault();
+            var planet = sortedPlanets.FirstOrDefault(p => p.IsOwned() && !p.IsOwnedBy(map.GetMyPlayerId()));
             if(planet != null){
                 DebugLog.AddLog($"Attack: {planet.GetId()}");
-                NavigateToAttack(beingAttacked, planet, ownedPlanets, unOwnedPlanets, moveList, map);
+                NavigateToAttack(beingAttacked, planet, sortedPlanets, moveList, map);
             }
         }
 
-        private static void MakeNextMove(Dictionary<Planet, int> beingAttacked, List<Planet> ownedPlanets, List<Planet> unOwnedPlanets, List<Move> moveList, GameMap map){            
-            ownedPlanets.Sort(PlanetComparer);
-            unOwnedPlanets.Sort(PlanetComparer);
-            CalculateMoves(beingAttacked, ownedPlanets, unOwnedPlanets, moveList, map);
+        private static void MakeNextMove(Dictionary<Planet, int> beingAttacked, List<Planet> sortedPlanets, List<Move> moveList, GameMap map){            
+            sortedPlanets.Sort(PlanetComparer);
+            CalculateMoves(beingAttacked, sortedPlanets, moveList, map);
         }
 
-        private static void NavigateToDock(Dictionary<Planet, int> beingAttacked, Planet planetToDock, List<Planet> ownedPlanets, List<Planet> unOwnedPlanets, List<Move> moveList, GameMap map, bool makeNextMove = true, Ship ship = null){
+        private static void NavigateToDock(Dictionary<Planet, int> beingAttacked, Planet planetToDock, List<Planet> sortedPlanets, List<Move> moveList, GameMap map, bool makeNextMove = true, Ship ship = null){
             DebugLog.AddLog($"Preparing to Dock: {planetToDock.GetId()}, Open Spots: {planetToDock.GetDockingSpots() - planetToDock.GetDockedShips().Count}");
             if(ship == null)
                 ship = planetToDock.ClosestUnclaimedShip;
@@ -173,11 +113,11 @@ namespace Halite2
 
             if(makeNextMove){                
                 ship.Claim(planetToDock);
-                MakeNextMove(beingAttacked, ownedPlanets, unOwnedPlanets, moveList, map);
+                MakeNextMove(beingAttacked, sortedPlanets, moveList, map);
             }
         }
 
-        private static void NavigateToAttack(Dictionary<Planet, int> beingAttacked, Planet planetToAttack, List<Planet> ownedPlanets, List<Planet> unOwnedPlanets, List<Move> moveList, GameMap map, bool makeNextMove = true, Ship ship = null){
+        private static void NavigateToAttack(Dictionary<Planet, int> beingAttacked, Planet planetToAttack, List<Planet> sortedPlanets, List<Move> moveList, GameMap map, bool makeNextMove = true, Ship ship = null){
             if(ship == null)
                 ship = planetToAttack.ClosestUnclaimedShip;
 
@@ -207,15 +147,15 @@ namespace Halite2
                 if (newThrustMove != null) {
                     moveList.Add(newThrustMove);
                 }
+            }
                 
-                if(makeNextMove){
-                    ship.Claim(planetToAttack);
-                    MakeNextMove(beingAttacked, ownedPlanets, unOwnedPlanets, moveList, map);
-                }
+            if(makeNextMove){
+                ship.Claim(planetToAttack);
+                MakeNextMove(beingAttacked, sortedPlanets, moveList, map);
             }
         }
 
-        private static void NavigateToDefend(Dictionary<Planet, int> beingAttacked, Planet planetToDefend, List<Planet> ownedPlanets, List<Planet> unOwnedPlanets, List<Move> moveList, GameMap map, bool makeNextMove = true, Ship ship = null){
+        private static void NavigateToDefend(Dictionary<Planet, int> beingAttacked, Planet planetToDefend, List<Planet> sortedPlanets, List<Move> moveList, GameMap map, bool makeNextMove = true, Ship ship = null){
             if(ship == null)
                 ship = planetToDefend.ClosestUnclaimedShip;
 
@@ -246,7 +186,7 @@ namespace Halite2
             
             if(makeNextMove){
                 ship.Claim(planetToDefend);
-                MakeNextMove(beingAttacked, ownedPlanets, unOwnedPlanets, moveList, map);
+                MakeNextMove(beingAttacked, sortedPlanets, moveList, map);
             }
         }
 
