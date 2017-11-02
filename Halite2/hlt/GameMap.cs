@@ -89,21 +89,21 @@ namespace Halite2.hlt {
             }
         }
 
-        public Dictionary<double, Entity> NearbyEntitiesByDistance(Entity entity) {
-            Dictionary<double, Entity> entityByDistance = new Dictionary<double, Entity>();
+        public Dictionary<Entity, double> NearbyEntitiesByDistance(Entity entity) {
+            Dictionary<Entity, double> entityByDistance = new Dictionary<Entity, double>();
 
             foreach (Planet planet in planets.Values) {
                 if (planet.Equals(entity)) {
                     continue;
                 }
-                entityByDistance[entity.GetDistanceTo(planet)] = planet;
+                entityByDistance[planet] = entity.GetDistanceTo(planet);
             }
 
             foreach (Ship ship in allShips) {
                 if (ship.Equals(entity)) {
                     continue;
                 }
-                entityByDistance[entity.GetDistanceTo(ship)] = ship;
+                entityByDistance[ship] = entity.GetDistanceTo(ship);
             }
 
             return entityByDistance;

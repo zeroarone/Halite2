@@ -1,9 +1,10 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
 namespace Halite2.hlt {
     public class Planet: Entity {
-
+        public double Points { get; set; }
         private int remainingProduction;
         private int currentProduction;
         private int dockingSpots;
@@ -34,7 +35,7 @@ namespace Halite2.hlt {
 
         public double ClosestUnclaimedShipDistance { 
             get {
-                var distance = ClosestUnclaimedShipAndDistance().Key;
+                var distance = ClosestUnclaimedShipAndDistance().Value;
                 return distance == 0 ? double.MaxValue : distance;
             }
         }
@@ -42,27 +43,34 @@ namespace Halite2.hlt {
         public Ship ClosestUnclaimedShip{
             get{
                 var shipWithDistance = ClosestUnclaimedShipAndDistance();
-                if(shipWithDistance.Key == 0){
+                if(shipWithDistance.Value == 0){
                     return null;
                 }
-                return (Ship)shipWithDistance.Value;
+                return (Ship)shipWithDistance.Key;
             }
         }
 
-        private KeyValuePair<double, Entity> ClosestUnclaimedShipAndDistance(){
+        private KeyValuePair<Entity, double> ClosestUnclaimedShipAndDistance() {
             return ShipsByDistance.FirstOrDefault(s => {
-                    var ship = (Ship)s.Value;
-                    return ship.GetDockingStatus() == Ship.DockingStatus.Undocked && !ship.Claimed;
-                });
+                var ship = (Ship)s.Key;
+                //if (!IsFull() && GetOwner() == ship.GetOwner()) {
+                //    var nextShipProducedInTurns = GetDockedShips().Count == 0 ? Int32.MaxValue : (72 - GetCurrentProduction()) / (Constants.BASE_PRODUCTIVITY * GetDockedShips().Count) % 6;
+                //    var timeToTravel = (ship.GetDistanceTo(ship.GetClosestPoint(this)) - Constants.DOCK_RADIUS) / 7;
+                //    if (timeToTravel >= nextShipProducedInTurns) {
+                //        return false;
+                //    }
+                //}
+                return ship.GetDockingStatus() == Ship.DockingStatus.Undocked && !ship.Claimed;
+            });
         }
 
         public void AddShipClaim(Ship ship){
             shipsClaimed[GetId()].Add(ship);
         }
 
-        public List<KeyValuePair<double, Entity>> ShipsByDistance {get;set;}
+        public List<KeyValuePair<Entity, double>> ShipsByDistance {get;set;}
 
-        public List<KeyValuePair<double, Entity>> NearbyEnemies {get;set;}
+        public List<KeyValuePair<Entity, double>> NearbyEnemies {get;set;}
 
         public int RemainingProduction => remainingProduction;
 

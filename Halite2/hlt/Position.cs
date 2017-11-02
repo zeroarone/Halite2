@@ -51,24 +51,25 @@ namespace Halite2.hlt {
             return new Position(x, y);
         }
 
-        public override bool Equals(Object o) {
-            if (this == o) 
-                return true;            
+        protected bool Equals(Position other) {
+            return xPos.Equals(other.xPos) && yPos.Equals(other.yPos);
+        }
 
-            if (o == null || GetType() != o.GetType())
-                return false;
-            
-            Position position = (Position)o;
-
-            if (position == null)
-                return false;
-
-            return Equals(position.xPos, xPos) && Equals(position.yPos, yPos);
+        public override bool Equals(object obj) {
+            if (ReferenceEquals(null, obj)) return false;
+            if (ReferenceEquals(this, obj)) return true;
+            if (obj.GetType() != this.GetType()) return false;
+            return Equals((Position) obj);
         }
 
         public override int GetHashCode() {
-            return base.GetHashCode();
+            unchecked {
+                return (xPos.GetHashCode() * 397) ^ yPos.GetHashCode();
+            }
         }
+
+        public static bool operator ==(Position left, Position right) { return Equals(left, right); }
+        public static bool operator !=(Position left, Position right) { return !Equals(left, right); }
 
         public override string ToString() {
             return "Position(" + xPos + ", " + yPos + ")";

@@ -53,8 +53,7 @@ namespace Halite2.hlt {
                 dockedShips.Add(int.Parse(metadata.Pop()));
             }
 
-            return new Planet(owner, id, xPos, yPos, health, radius, dockingSpots,
-                              currentProduction, remainingProduction, dockedShips);
+            return new Planet(owner, id, xPos, yPos, health, radius, dockingSpots, currentProduction, remainingProduction, dockedShips);
         }
 
         public static int ParsePlayerNum(Metadata metadata) {
