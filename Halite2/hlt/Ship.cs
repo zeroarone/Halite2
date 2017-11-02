@@ -48,6 +48,11 @@ namespace Halite2.hlt
             return GetDistanceTo(planet) <= Constants.DOCK_RADIUS + planet.GetRadius();
         }
 
+        public bool CanDock(Position position){
+            DebugLog.AddLog($"Distance to dock position: {GetDistanceTo(position)}");
+            return GetDistanceTo(position) <= Constants.DOCK_RADIUS;
+        }
+
         public override string ToString()
         {
             return "Ship[" +

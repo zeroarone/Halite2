@@ -37,10 +37,30 @@ namespace Halite2
                             
                             if(planet.NearbyEnemies.Count > 0){
                                 DebugLog.AddLog("Found attacking enemies, defending.");
-                                beingAttacked.Add(planet, planet.NearbyEnemies.Count * 3);
+                                beingAttacked.Add(planet, planet.NearbyEnemies.Count * 2);
                             }
                         }
+                        else{
+                            Planet.ClaimedDockingPorts[planet.GetId()].Clear();
+                        }
                         planet.ShipsByDistance = gameMap.NearbyEntitiesByDistance(planet).Where(e => e.Key.GetType() == typeof(Ship) && e.Key.GetOwner() == gameMap.MyPlayerId).OrderBy(kvp => kvp.Value).ToList();
+                    }
+
+                    foreach(var planetClaims in Planet.ClaimedDockingPorts){
+                        var dockingPortsToUnclaim = new List<int>();
+                        foreach(var dockAndShip in planetClaims.Value){
+                            var ship = gameMap.GetShip(dockAndShip.Value.GetId());
+                            if(ship == null){
+                                dockingPortsToUnclaim.Add(dockAndShip.Key);
+                                continue;
+                            }
+                            if(ship.GetDockingStatus() == Ship.DockingStatus.Undocked)
+                                NavigateToDock(beingAttacked, gameMap.GetPlanet(planetClaims.Key), sortedPlanets, moveList, gameMap, false, ship);
+                        }
+
+                        foreach(var s in dockingPortsToUnclaim){
+                            planetClaims.Value.Remove(s);
+                        }
                     }
 
                     sortedPlanets.Sort(PlanetComparer);
@@ -71,24 +91,56 @@ namespace Halite2
             if(ship == null)
                 return;
 
-            if(ship.CanDock(planetToDock)){
+            DebugLog.AddLog($"Docking with ship: {ship}");
+            var dockingSpot = planetToDock.GetClosestEmptyDockingPort(ship);
+            DebugLog.AddLog($"Docking spot: {dockingSpot}");
+
+            if(ship.CanDock(dockingSpot)){
                 DebugLog.AddLog("Docking with planet");
                 moveList.Add(new DockMove(ship, planetToDock));
             }
             else{
-                DebugLog.AddLog("Navigating to dock");
-                var move = Navigation.NavigateShipToDock(map, ship, planetToDock, Constants.MAX_SPEED);
+                DebugLog.AddLog($"Navigating to dock {dockingSpot}");
+                var goLeft = ShouldGoLeft(map, planetToDock, ship, dockingSpot);
+                var move = Navigation.NavigateShipToDock(map, ship, dockingSpot, Constants.MAX_SPEED, Math.PI / 180.0 * (goLeft ? -1 : 1));
                 if(move != null){
                     moveList.Add(move);
                 }
+                else{
+                    moveList.Add(new ThrustMove(ship, ship.OrientTowardsInDeg(planetToDock) + 90, Constants.MAX_SPEED));
+                }
             }
 
-            planetToDock.ClaimDockingSpot(ship.GetId());
-
-            if(makeNextMove){                
-                ship.Claim();
+            planetToDock.ClaimDockingSpot(ship, dockingSpot);
+       
+            ship.Claim();
+            if(makeNextMove){         
                 MakeNextMove(beingAttacked, sortedPlanets, moveList, map);
             }
+        }
+
+        private static bool ShouldGoLeft(GameMap map, Planet planetToGoAround, Ship ship, Position positionToReach){
+            var goLeft = false;
+            if(map.ObjectsBetween(ship, positionToReach).Contains(planetToGoAround)){
+                var closestPoint = planetToGoAround.GetClosestPoint(ship);
+                        
+                var directionClosest = Math.Atan2(closestPoint.GetYPos() - planetToGoAround.GetYPos(), closestPoint.GetXPos() - planetToGoAround.GetXPos());
+                var directionDocking = Math.Atan2(positionToReach.GetYPos() - planetToGoAround.GetYPos(), positionToReach.GetXPos() - planetToGoAround.GetXPos());
+
+                var angle = directionClosest - directionDocking;
+                while(angle < 0){
+                    angle += 2*Math.PI;
+                }
+                while(angle > 2 * Math.PI){
+                    angle -= 2*Math.PI;
+                }
+
+                if(angle > Math.PI){
+                    goLeft = true;
+                }
+            }
+
+            return goLeft;
         }
 
         private static void NavigateToAttack(Dictionary<Planet, int> beingAttacked, Planet planetToAttack, List<Planet> sortedPlanets, List<Move> moveList, GameMap map) {
@@ -112,12 +164,13 @@ namespace Halite2
                 moveList.Add(new Move(Move.MoveType.Noop, ship));
             }
             else {
+               var goLeft = ShouldGoLeft(map, planetToAttack, ship, closestShip);
+
                 ThrustMove newThrustMove = Navigation.NavigateShipTowardsTarget(map, ship,
                     closestShip,
                     Math.Min(Constants.MAX_SPEED,
                         (int) Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS - 1, 1))), true,
-                    Constants.MAX_NAVIGATION_CORRECTIONS,
-                    Math.PI / 180.0);
+                    Constants.MAX_NAVIGATION_CORRECTIONS, Math.PI / 180.0 * (goLeft ? -1 : 1));
                 if (newThrustMove != null) {
                     moveList.Add(newThrustMove);
                 }
@@ -191,19 +244,19 @@ namespace Halite2
 
         private static void CalculateMoves (Dictionary<Planet, int> beingAttacked, List<Planet> sortedPlanets, List<Move> moveList, GameMap map){
             // Defend
-            var attackedPlanet = beingAttacked.FirstOrDefault(kvp => kvp.Value > 0);
-            if(attackedPlanet.Key != null){
-                NavigateToDefend(beingAttacked, attackedPlanet.Key, sortedPlanets, moveList, map);
-                return;
-            }
+            // var attackedPlanet = beingAttacked.FirstOrDefault(kvp => kvp.Value > 0);
+            // if(attackedPlanet.Key != null){
+            //     NavigateToDefend(beingAttacked, attackedPlanet.Key, sortedPlanets, moveList, map);
+            //     return;
+            // }
 
-            if (sortedPlanets.All(p => p.IsOwned())) {
-                var planetToDefend = sortedPlanets.FirstOrDefault(p => p.IsOwnedBy(map.MyPlayerId) && (p.DefendingShip == null || map.GetShip(p.DefendingShip.GetId()) == null));
-                if (planetToDefend != null) {
-                    NavigateToDefend(beingAttacked, planetToDefend, sortedPlanets, moveList, map);
-                    return;
-                }
-            }
+            // if (sortedPlanets.All(p => p.IsOwned())) {
+            //     var planetToDefend = sortedPlanets.FirstOrDefault(p => p.IsOwnedBy(map.MyPlayerId) && (p.DefendingShip == null || map.GetShip(p.DefendingShip.GetId()) == null));
+            //     if (planetToDefend != null) {
+            //         NavigateToDefend(beingAttacked, planetToDefend, sortedPlanets, moveList, map);
+            //         return;
+            //     }
+            // }
 
             // Try to fill up our planets or capture unowned planets.
             var planetToDock = sortedPlanets.FirstOrDefault(p => (!p.IsOwned() || p.IsOwnedBy(map.MyPlayerId)) && !p.IsFull());
