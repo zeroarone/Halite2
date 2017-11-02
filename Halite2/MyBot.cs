@@ -14,7 +14,8 @@ namespace Halite2
                 
                 Networking networking = new Networking();
                 GameMap gameMap = networking.Initialize(name);
-                
+
+                Dictionary<int, int> ownedPlanets = new Dictionary<int, int>();
                 List<Move> moveList = new List<Move>();
                 int step = 1;
                 for (;;) {
@@ -26,6 +27,12 @@ namespace Halite2
                     Dictionary<Planet, int> beingAttacked = new Dictionary<Planet, int>();
 
                     foreach(Planet planet in gameMap.GetAllPlanets().Select(kvp => kvp.Value)){
+                        if (ownedPlanets.ContainsKey(planet.GetId()) && ownedPlanets[planet.GetId()] != planet.GetOwner() && ownedPlanets[planet.GetId()] != -1) {
+                            ClearClaimedDockingPorts(gameMap);
+                        }
+
+                        ownedPlanets[planet.GetId()] = planet.GetOwner();
+
                         sortedPlanets.Add(planet);
                         if(planet.IsOwnedBy(gameMap.GetMyPlayerId())){
                             var dockedShips = planet.GetDockedShips().Select(s => gameMap.GetShip(s));
@@ -40,7 +47,28 @@ namespace Halite2
                                 beingAttacked.Add(planet, planet.NearbyEnemies.Count * 2);
                             }
                         }
+                        else if(planet.IsOwned()){
+                            Planet.ClaimedDockingPorts[planet.GetId()].Clear();
+                        }
                         planet.ShipsByDistance = gameMap.NearbyEntitiesByDistance(planet).Where(e => e.Value.GetType() == typeof(Ship) && e.Value.GetOwner() == gameMap.GetMyPlayerId()).OrderBy(kvp => kvp.Key).ToList();
+                    }
+
+                    foreach(var planetClaims in Planet.ClaimedDockingPorts){
+                        var dockingPortsToUnclaim = new List<int>();
+                        foreach(var dockAndShip in planetClaims.Value){
+                            var ship = gameMap.GetShip(dockAndShip.Value.GetId());
+                            if(ship == null){
+                                dockingPortsToUnclaim.Add(dockAndShip.Key);
+                                continue;
+                            }
+                            if(ship.GetDockingStatus() == Ship.DockingStatus.Undocked)
+                                NavigateToDock(beingAttacked, gameMap.GetPlanet(planetClaims.Key), sortedPlanets, moveList, gameMap, false, ship);
+                        }
+
+                        foreach(var s in dockingPortsToUnclaim){
+                            DebugLog.AddLog($"Unclaiming dock {s}");
+                            planetClaims.Value.Remove(s);
+                        }
                     }
 
                     MakeNextMove(beingAttacked, sortedPlanets, moveList, gameMap);
@@ -51,6 +79,25 @@ namespace Halite2
             catch (Exception ex) {
                 DebugLog.AddLog($"{ex.Message}: {ex.StackTrace}");
                 Networking.SendMoves(new List<Move>());
+            }
+        }
+
+        private static void ClearClaimedDockingPorts(GameMap gameMap) {
+            foreach(var planetClaims in Planet.ClaimedDockingPorts){
+                var dockingPortsToUnclaim = new List<int>();
+                foreach(var dockAndShip in planetClaims.Value){
+                    var ship = gameMap.GetShip(dockAndShip.Value.GetId());
+                    if(ship == null){
+                        continue;
+                    }
+                    if(ship.GetDockingStatus() == Ship.DockingStatus.Undocked)
+                        dockingPortsToUnclaim.Add(dockAndShip.Key);
+                }
+
+                foreach(var s in dockingPortsToUnclaim){
+                    DebugLog.AddLog($"Unclaiming dock {s}");
+                    planetClaims.Value.Remove(s);
+                }
             }
         }
 
@@ -94,25 +141,33 @@ namespace Halite2
             if(ship == null)
                 return;
 
-            if (ship.CanDock(planetToDock)) {
+            var dockingSpot = planetToDock.GetClosestEmptyDockingPort(ship);
+
+            DebugLog.AddLog($"Ship: {ship}");
+            DebugLog.AddLog($"DockingPort: {dockingSpot}");
+
+            if (ship.CanDock(dockingSpot)) {
                 DebugLog.AddLog("Docking with planet");
                 moveList.Add(new DockMove(ship, planetToDock));
             }
             else {
                 DebugLog.AddLog("Navigating to dock");
+                var counterClockWise = ShouldGoCounterClockWise(map, ship, dockingSpot);
+                DebugLog.AddLog($"Going {(counterClockWise ? "counter-clockwise" : "clockwise")}");
 
-                var goLeft = ShouldGoLeft(map, ship, planetToDock);
-
-                var move = Navigation.NavigateShipToDock(map, ship, planetToDock, Constants.MAX_SPEED, true);
-                if (move != null) {
+                var move = Navigation.NavigateShipToDock(map, ship, dockingSpot, Constants.MAX_SPEED, Math.PI / 180.0 * (counterClockWise ? -1 : 1));
+                if(move != null){
                     moveList.Add(move);
+                }
+                else{
+                    moveList.Add(new ThrustMove(ship, ship.OrientTowardsInDeg(planetToDock) + 90, Constants.MAX_SPEED));
                 }
             }
 
-            planetToDock.ClaimDockingSpot(ship.GetId());
-
-            if(makeNextMove){                
-                ship.Claim(planetToDock);
+            planetToDock.ClaimDockingSpot(ship, dockingSpot);
+               
+            ship.Claim(planetToDock);
+            if(makeNextMove){             
                 MakeNextMove(beingAttacked, sortedPlanets, moveList, map);
             }
         }
@@ -139,7 +194,7 @@ namespace Halite2
                 moveList.Add(new Move(Move.MoveType.Noop, ship));
             }
             else {
-                var goLeft = ShouldGoLeft(map, ship, closestShip);
+                var goLeft = ShouldGoCounterClockWise(map, ship, closestShip);
 
                 ThrustMove newThrustMove = Navigation.NavigateShipTowardsTarget(map, ship,
                     closestShip, Math.Min(Constants.MAX_SPEED, (int)Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS / 2, 1))), true, Constants.MAX_NAVIGATION_CORRECTIONS,
@@ -174,7 +229,7 @@ namespace Halite2
                 moveList.Add(new Move(Move.MoveType.Noop, ship));
             }
             else {
-                var goLeft = ShouldGoLeft(map, ship, closestShip);
+                var goLeft = ShouldGoCounterClockWise(map, ship, closestShip);
 
                 ThrustMove newThrustMove = Navigation.NavigateShipTowardsTarget(map, ship,
                     closestShip, Math.Min(Constants.MAX_SPEED, (int)Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS/2, 1))), true, Constants.MAX_NAVIGATION_CORRECTIONS,
@@ -190,13 +245,16 @@ namespace Halite2
             }
         }
 
-        private static bool ShouldGoLeft(GameMap map, Ship ship, Position target){
+        private static bool ShouldGoCounterClockWise(GameMap map, Ship ship, Position target){
             var goLeft = false;
 
             var obstacles = map.ObjectsBetween(ship, target);
             
             if (obstacles.Any()) {
                 var obstacle = obstacles.OrderBy(o => o.GetDistanceTo(ship)).First();
+                DebugLog.AddLog($"Obstacle found: {obstacle}");
+                DebugLog.AddLog($"Starting point: {ship}");
+                DebugLog.AddLog($"Ending point: {target}");
 
                 var closestPointToShip = obstacle.GetClosestPoint(ship);
                 var closestPointToTarget = obstacle.GetClosestPoint(target);
