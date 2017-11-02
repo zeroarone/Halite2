@@ -5,15 +5,11 @@ namespace Halite2.hlt
 {
     public class Navigation
     {
-        public static ThrustMove NavigateShipToDock(
-                GameMap gameMap,
-                Ship ship,
-                Entity dockTarget,
-                int maxThrust)
+        public static ThrustMove NavigateShipToDock(GameMap gameMap, Ship ship, Entity dockTarget, int maxThrust, bool goLeft)
         {
             int maxCorrections = Constants.MAX_NAVIGATION_CORRECTIONS;
             bool avoidObstacles = true;
-            double angularStepRad = Math.PI / 180.0;
+            double angularStepRad = Math.PI / 180.0 * (goLeft ? -1 : 1);
             Position targetPos = ship.GetClosestPoint(dockTarget);
 
             return NavigateShipTowardsTarget(gameMap, ship, targetPos, maxThrust, avoidObstacles, maxCorrections, angularStepRad);

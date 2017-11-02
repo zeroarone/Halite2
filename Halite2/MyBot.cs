@@ -32,7 +32,7 @@ namespace Halite2
                             var dockedShips = planet.GetDockedShips().Select(s => gameMap.GetShip(s));
                             planet.NearbyEnemies = new List<KeyValuePair<double, Entity>>();
                             foreach(var ship in dockedShips){
-                                planet.NearbyEnemies.AddRange(gameMap.NearbyEntitiesByDistance(ship).Where(e => e.Value.GetType() == typeof(Ship) && e.Value.GetOwner() != gameMap.GetMyPlayerId() && e.Key < Constants.SHIP_RADIUS + 1).OrderBy(kvp => kvp.Key));                                
+                                planet.NearbyEnemies.AddRange(gameMap.NearbyEntitiesByDistance(ship).Where(e => e.Value.GetType() == typeof(Ship) && e.Value.GetOwner() != gameMap.GetMyPlayerId() && e.Key < Constants.WEAPON_RADIUS + 1).OrderBy(kvp => kvp.Key));                                
                             }
                             planet.NearbyEnemies.Sort((kvp1, kvp2) => kvp1.Key.CompareTo(kvp2.Key));
                             
@@ -154,14 +154,17 @@ namespace Halite2
             if(ship == null)
                 return;
 
-            if(ship.CanDock(planetToDock)){
+            if (ship.CanDock(planetToDock)) {
                 DebugLog.AddLog("Docking with planet");
                 moveList.Add(new DockMove(ship, planetToDock));
             }
-            else{
+            else {
                 DebugLog.AddLog("Navigating to dock");
-                var move = Navigation.NavigateShipToDock(map, ship, planetToDock, Constants.MAX_SPEED);
-                if(move != null){
+
+                var goLeft = ShouldGoLeft(map, ship, planetToDock);
+
+                var move = Navigation.NavigateShipToDock(map, ship, planetToDock, Constants.MAX_SPEED, true);
+                if (move != null) {
                     moveList.Add(move);
                 }
             }
@@ -192,13 +195,15 @@ namespace Halite2
                 }
             }
 
-            if(closestShipDistance < ship.GetRadius()){
+            if(closestShipDistance < Constants.WEAPON_RADIUS / 2){
                 moveList.Add(new Move(Move.MoveType.Noop, ship));
             }
-            else{
+            else {
+                var goLeft = ShouldGoLeft(map, ship, closestShip);
+
                 ThrustMove newThrustMove = Navigation.NavigateShipTowardsTarget(map, ship,
-                    closestShip, Math.Min(Constants.MAX_SPEED, (int)Math.Floor(Math.Max(closestShipDistance - ship.GetRadius() - 1, 0))), true, Constants.MAX_NAVIGATION_CORRECTIONS,
-                    Math.PI / 180.0);
+                    closestShip, Math.Min(Constants.MAX_SPEED, (int)Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS / 2, 1))), true, Constants.MAX_NAVIGATION_CORRECTIONS,
+                    Math.PI / 180.0 * (goLeft ? -1 : 1));
                 if (newThrustMove != null) {
                     moveList.Add(newThrustMove);
                 }
@@ -228,10 +233,12 @@ namespace Halite2
             if(closestShipDistance < ship.GetRadius()){
                 moveList.Add(new Move(Move.MoveType.Noop, ship));
             }
-            else{
+            else {
+                var goLeft = ShouldGoLeft(map, ship, closestShip);
+
                 ThrustMove newThrustMove = Navigation.NavigateShipTowardsTarget(map, ship,
-                    closestShip, Math.Min(Constants.MAX_SPEED, (int)Math.Floor(Math.Max(closestShipDistance - ship.GetRadius() - 1, 0))), true, Constants.MAX_NAVIGATION_CORRECTIONS,
-                    Math.PI / 180.0);
+                    closestShip, Math.Min(Constants.MAX_SPEED, (int)Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS/2, 1))), true, Constants.MAX_NAVIGATION_CORRECTIONS,
+                    Math.PI / 180.0 * (goLeft ? -1 : 1));
                 if (newThrustMove != null) {
                     moveList.Add(newThrustMove);
                 }
@@ -241,6 +248,36 @@ namespace Halite2
                 ship.Claim(planetToDefend);
                 MakeNextMove(beingAttacked, ownedPlanets, unOwnedPlanets, moveList, map);
             }
+        }
+
+        private static bool ShouldGoLeft(GameMap map, Ship ship, Position target){
+            var goLeft = false;
+
+            var obstacles = map.ObjectsBetween(ship, target);
+            
+            if (obstacles.Any()) {
+                var obstacle = obstacles.OrderBy(o => o.GetDistanceTo(ship)).First();
+
+                var closestPointToShip = obstacle.GetClosestPoint(ship);
+                var closestPointToTarget = obstacle.GetClosestPoint(target);
+                        
+                var directionToShip = Math.Atan2(closestPointToShip.GetYPos() - obstacle.GetYPos(), closestPointToShip.GetXPos() - obstacle.GetXPos());
+                var directionToTarget = Math.Atan2(closestPointToTarget.GetYPos() - obstacle.GetYPos(), closestPointToTarget.GetXPos() - obstacle.GetXPos());
+
+                var angle = directionToShip - directionToTarget;
+                while(angle < 0){
+                    angle += 2*Math.PI;
+                }
+                while(angle > 2 * Math.PI){
+                    angle -= 2*Math.PI;
+                }
+
+                if(angle > Math.PI){
+                    goLeft = true;
+                }
+            }
+
+            return goLeft;
         }
     }
 }
