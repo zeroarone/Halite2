@@ -40,6 +40,9 @@ namespace Halite2.hlt
         /** Number of turns it takes to create a ship per docked ship */
         public static int BASE_PRODUCTIVITY = 6;
 
+        // Halite required to produce a ship
+        public static int RESOURCES_FOR_SHIP_PRODUCTION = 72;
+
         /** Distance from the planets edge at which new ships are created */
         public static double SPAWN_RADIUS = 2.0;
 

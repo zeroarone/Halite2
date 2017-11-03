@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -5,77 +6,59 @@ namespace Halite2.hlt
 {
     public class Planet : Entity
     {
-        private readonly int currentProduction;
-        private readonly IList<int> dockedShips;
-        private readonly int dockingSpots;
-
-        public Ship ClosestUnclaimedShip {
-            get {
-                var shipWithDistance = ClosestUnclaimedShipAndDistance();
-                if (shipWithDistance.Value == 0) return null;
-                return (Ship) shipWithDistance.Key;
-            }
-        }
-
-        public double ClosestUnclaimedShipDistance {
-            get {
-                var distance = ClosestUnclaimedShipAndDistance().Value;
-                return distance == 0 ? double.MaxValue : distance;
-            }
-        }
-
-        public List<KeyValuePair<Entity, double>> NearbyEnemies { get; set; }
+        public int CurrentProduction { get; }
+        public IList<int> DockedShips { get; }
+        public int DockingSpots { get; }
+        public bool IsFull => DockedShips.Count == DockingSpots;
+        public bool IsOwned => Owner != -1;
         public double Points { get; set; }
-
         public int RemainingProduction { get; }
-
         public List<KeyValuePair<Entity, double>> ShipsByDistance { get; set; }
 
         public Planet(int owner, int id, double xPos, double yPos, int health,
             double radius, int dockingSpots, int currentProduction,
             int remainingProduction, List<int> dockedShips)
             : base(owner, id, xPos, yPos, health, radius) {
-            this.dockingSpots = dockingSpots;
-            this.currentProduction = currentProduction;
+            DockingSpots = dockingSpots;
+            CurrentProduction = currentProduction;
             RemainingProduction = remainingProduction;
-            this.dockedShips = dockedShips;
+            DockedShips = dockedShips;
         }
 
-        private KeyValuePair<Entity, double> ClosestUnclaimedShipAndDistance() {
-            return ShipsByDistance.FirstOrDefault(s => {
-                var ship = (Ship) s.Key;
-                //if (!IsFull() && GetOwner() == ship.GetOwner()) {
-                //    var nextShipProducedInTurns = GetDockedShips().Count == 0 ? Int32.MaxValue : (72 - GetCurrentProduction()) / (Constants.BASE_PRODUCTIVITY * GetDockedShips().Count) % 6;
-                //    var timeToTravel = (ship.GetDistanceTo(ship.GetClosestPoint(this)) - Constants.DOCK_RADIUS) / 7;
-                //    if (timeToTravel >= nextShipProducedInTurns) {
-                //        return false;
-                //    }
-                //}
-                return ship.DockingStatus== DockingStatus.Undocked && !ship.Claimed;
-            });
+        public Ship GetClosestUnclaimedShip {
+            get {
+                var shipWithDistance = GetClosestUnclaimedShipAndDistance;
+                if (shipWithDistance.Value == 0) return null;
+                return (Ship) shipWithDistance.Key;
+            }
         }
 
-        public int GetCurrentProduction() { return currentProduction; }
+        private KeyValuePair<Entity, double> GetClosestUnclaimedShipAndDistance {
+            get {
+                return ShipsByDistance.FirstOrDefault(s => {
+                    var ship = (Ship) s.Key;
+                    return ship.DockingStatus == DockingStatus.Undocked && !ship.Claimed;
+                });
+            }
+        }
 
-        public int GetDockingSpots() { return dockingSpots; }
-
-        public IList<int> GetDockedShips() { return dockedShips; }
-
-        public bool IsFull() { return dockedShips.Count == dockingSpots; }
-
-        public void ClaimDockingSpot(int entity) { dockedShips.Add(entity); }
-
-        public bool IsOwned() { return Owner != -1; }
+        public int FramesToNextSpawn => DockedShips.Count == 0 ? Int32.MaxValue : (int)Math.Ceiling(((double)Constants.RESOURCES_FOR_SHIP_PRODUCTION - CurrentProduction) / (Constants.BASE_PRODUCTIVITY * DockedShips.Count));
 
         public bool IsOwnedBy(int player) { return Owner == player; }
+
+        public int GetAvailableDockingPorts(int playerId) {
+            if (IsOwnedBy(playerId) || !IsOwned)
+                return DockingSpots - DockedShips.Count;
+            return 0;
+        }
 
         public override string ToString() {
             return "Planet[" +
                    base.ToString() +
                    ", remainingProduction=" + RemainingProduction +
-                   ", currentProduction=" + currentProduction +
-                   ", dockingSpots=" + dockingSpots +
-                   ", dockedShips=" + dockedShips +
+                   ", currentProduction=" + CurrentProduction +
+                   ", dockingSpots=" + DockingSpots +
+                   ", dockedShips=" + DockedShips +
                    "]";
         }
     }
