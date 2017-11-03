@@ -15,31 +15,31 @@ namespace Halite2.hlt
             StringBuilder moveString = new StringBuilder();
 
             foreach (Move move in moves) {
-                switch (move.GetMoveType()) {
-                    case Move.MoveType.Noop:
+                switch (move.Type) {
+                    case MoveType.Noop:
                         continue;
-                    case Move.MoveType.Undock:
+                    case MoveType.Undock:
                         moveString.Append(UNDOCK_KEY)
                             .Append(" ")
-                            .Append(move.GetShip().GetId())
+                            .Append(move.Ship.Id)
                             .Append(" ");
                         break;
-                    case Move.MoveType.Dock:
+                    case MoveType.Dock:
                         moveString.Append(DOCK_KEY)
                             .Append(" ")
-                            .Append(move.GetShip().GetId())
+                            .Append(move.Ship.Id)
                             .Append(" ")
-                            .Append(((DockMove) move).GetDestinationId())
+                            .Append(((DockMove) move).DestinationId)
                             .Append(" ");
                         break;
-                    case Move.MoveType.Thrust:
+                    case MoveType.Thrust:
                         moveString.Append(THRUST_KEY)
                             .Append(" ")
-                            .Append(move.GetShip().GetId())
+                            .Append(move.Ship.Id)
                             .Append(" ")
-                            .Append(((ThrustMove) move).GetThrust())
+                            .Append(((ThrustMove) move).Thrust)
                             .Append(" ")
-                            .Append(((ThrustMove) move).GetAngle())
+                            .Append(((ThrustMove) move).Angle)
                             .Append(" ");
                         break;
                 }

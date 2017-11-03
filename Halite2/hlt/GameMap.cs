@@ -2,107 +2,67 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Halite2.hlt {
-
-    public class GameMap {
-        private int width, height;
-        private int playerId;
-        private List<Player> players;
-        private IList<Player> playersUnmodifiable;
-        private Dictionary<int, Planet> planets;
-        Dictionary<int, Ship> ships;
-        private List<Ship> allShips;
-        private IList<Ship> allShipsUnmodifiable;
-
+namespace Halite2.hlt
+{
+    public class GameMap
+    {
+        private readonly List<Ship> allShips;
         // used only during parsing to reduce memory allocations
-        private List<Ship> currentShips = new List<Ship>();
+        private readonly List<Ship> currentShips = new List<Ship>();
+        private readonly List<Player> players;
+        Dictionary<int, Ship> ships;
+
+        public Dictionary<int, Planet> AllPlanets { get; }
+        public IList<Player> AllPlayers { get; }
+        public IList<Ship> AllShips { get; }
+        public int Height { get; }
+        public Player MyPlayer => AllPlayers[MyPlayerId];
+        public int MyPlayerId { get; }
+        public int Width { get; }
 
         public GameMap(int width, int height, int playerId) {
-            this.width = width;
-            this.height = height;
-            this.playerId = playerId;
+            Width = width;
+            Height = height;
+            MyPlayerId = playerId;
             players = new List<Player>(Constants.MAX_PLAYERS);
-            playersUnmodifiable = players.AsReadOnly();
-            planets = new Dictionary<int, Planet>();
+            AllPlayers = players.AsReadOnly();
+            AllPlanets = new Dictionary<int, Planet>();
             allShips = new List<Ship>();
-            allShipsUnmodifiable = allShips.AsReadOnly();
+            AllShips = allShips.AsReadOnly();
         }
 
-        public int GetHeight() {
-            return height;
-        }
+        public Ship GetShip(int playerId, int entityId) { return players[playerId].GetShip(entityId); }
 
-        public int GetWidth() {
-            return width;
-        }
+        public Ship GetShip(int entityId) { return ships[entityId]; }
 
-        public int GetMyPlayerId() {
-            return playerId;
-        }
-
-        public IList<Player> GetAllPlayers() {
-            return playersUnmodifiable;
-        }
-
-        public Player GetMyPlayer() => playersUnmodifiable[GetMyPlayerId()];
-
-        public Ship GetShip(int playerId, int entityId) {
-            return players[playerId].GetShip(entityId);
-        }
-
-        public Ship GetShip(int entityId){
-            return ships[entityId];
-        }
-
-        public Planet GetPlanet(int entityId) {
-            return planets[entityId];
-        }
-
-        public Dictionary<int, Planet> GetAllPlanets() {
-            return planets;
-        }
-
-        public IList<Ship> GetAllShips() {
-            return allShipsUnmodifiable;
-        }
+        public Planet GetPlanet(int entityId) { return AllPlanets[entityId]; }
 
         public List<Entity> ObjectsBetween(Position start, Position target) {
-            List<Entity> entitiesFound = new List<Entity>();
+            var entitiesFound = new List<Entity>();
 
-            AddEntitiesBetween(entitiesFound, start, target, planets.Values.ToList<Entity>());
+            AddEntitiesBetween(entitiesFound, start, target, AllPlanets.Values.ToList<Entity>());
             AddEntitiesBetween(entitiesFound, start, target, allShips.ToList<Entity>());
 
             return entitiesFound;
         }
 
-        private static void AddEntitiesBetween(List<Entity> entitiesFound,
-                                               Position start, Position target,
-                                               ICollection<Entity> entitiesToCheck) {
-
-            foreach (Entity entity in entitiesToCheck) {
-                if (entity.Equals(start) || entity.Equals(target)) {
-                    continue;
-                }
-                if (Collision.segmentCircleIntersect(start, target, entity, Constants.FORECAST_FUDGE_FACTOR)) {
-                    entitiesFound.Add(entity);
-                }
+        private static void AddEntitiesBetween(List<Entity> entitiesFound, Position start, Position target, ICollection<Entity> entitiesToCheck) {
+            foreach (var entity in entitiesToCheck) {
+                if (entity.Equals(start) || entity.Equals(target)) continue;
+                if (Collision.SegmentCircleIntersect(start, target, entity, Constants.FORECAST_FUDGE_FACTOR)) entitiesFound.Add(entity);
             }
         }
 
         public Dictionary<Entity, double> NearbyEntitiesByDistance(Entity entity) {
-            Dictionary<Entity, double> entityByDistance = new Dictionary<Entity, double>();
+            var entityByDistance = new Dictionary<Entity, double>();
 
-            foreach (Planet planet in planets.Values) {
-                if (planet.Equals(entity)) {
-                    continue;
-                }
+            foreach (var planet in AllPlanets.Values) {
+                if (planet.Equals(entity)) continue;
                 entityByDistance[planet] = entity.GetDistanceTo(planet);
             }
 
-            foreach (Ship ship in allShips) {
-                if (ship.Equals(entity)) {
-                    continue;
-                }
+            foreach (var ship in allShips) {
+                if (ship.Equals(entity)) continue;
                 entityByDistance[ship] = entity.GetDistanceTo(ship);
             }
 
@@ -110,44 +70,39 @@ namespace Halite2.hlt {
         }
 
         public GameMap UpdateMap(Metadata mapMetadata) {
-            int numberOfPlayers = MetadataParser.ParsePlayerNum(mapMetadata);
+            var numberOfPlayers = MetadataParser.ParsePlayerNum(mapMetadata);
 
             players.Clear();
-            planets.Clear();
+            AllPlanets.Clear();
             allShips.Clear();
 
             // update players info
-            for (int i = 0; i < numberOfPlayers; ++i) {
+            for (var i = 0; i < numberOfPlayers; ++i) {
                 currentShips.Clear();
-                Dictionary<int, Ship> currentPlayerShips = new Dictionary<int, Ship>();
-                int playerId = MetadataParser.ParsePlayerId(mapMetadata);
+                var currentPlayerShips = new Dictionary<int, Ship>();
+                var playerId = MetadataParser.ParsePlayerId(mapMetadata);
 
-                Player currentPlayer = new Player(playerId, currentPlayerShips);
+                var currentPlayer = new Player(playerId, currentPlayerShips);
                 MetadataParser.PopulateShipList(currentShips, playerId, mapMetadata);
                 allShips.AddRange(currentShips);
 
-                foreach (Ship ship in currentShips) {
-                    currentPlayerShips[ship.GetId()] = ship;
-                }
+                foreach (var ship in currentShips) currentPlayerShips[ship.Id] = ship;
                 players.Add(currentPlayer);
             }
 
-            ships = allShips.ToDictionary(s => s.GetId());
+            ships = allShips.ToDictionary(s => s.Id);
 
-            int numberOfPlanets = int.Parse(mapMetadata.Pop());
+            var numberOfPlanets = int.Parse(mapMetadata.Pop());
 
-            for (int i = 0; i < numberOfPlanets; ++i) {
-                List<int> dockedShips = new List<int>();
-                Planet planet = MetadataParser.NewPlanetFromMetadata(dockedShips, mapMetadata);
-                planets[planet.GetId()] = planet;
+            for (var i = 0; i < numberOfPlanets; ++i) {
+                var dockedShips = new List<int>();
+                var planet = MetadataParser.NewPlanetFromMetadata(dockedShips, mapMetadata);
+                AllPlanets[planet.Id] = planet;
             }
 
-            if (!mapMetadata.IsEmpty()) {
-                throw new InvalidOperationException("Failed to parse data from Halite game engine. Please contact maintainers.");
-            }
+            if (!mapMetadata.IsEmpty()) throw new InvalidOperationException("Failed to parse data from Halite game engine. Please contact maintainers.");
 
             return this;
         }
     }
-
 }

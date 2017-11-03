@@ -1,78 +1,62 @@
 using System;
 
-namespace Halite2.hlt {
+namespace Halite2.hlt
+{
+    public class Position
+    {
+        public virtual double Radius => 0;
 
-    public class Position {
-
-        private double xPos;
-        private double yPos;
+        public double XPos { get; }
+        public double YPos { get; }
 
         public Position(double xPos, double yPos) {
-            this.xPos = xPos;
-            this.yPos = yPos;
-        }
-
-        public double GetXPos() {
-            return xPos;
-        }
-
-        public double GetYPos() {
-            return yPos;
+            XPos = xPos;
+            YPos = yPos;
         }
 
         public double GetDistanceTo(Position target) {
-            double dx = xPos - target.GetXPos();
-            double dy = yPos - target.GetYPos();
+            var dx = XPos - target.XPos;
+            var dy = YPos - target.YPos;
             return Math.Sqrt(Math.Pow(dx, 2) + Math.Pow(dy, 2));
         }
 
-        public virtual double GetRadius() {
-            return 0;
-        }
-
-        public int OrientTowardsInDeg(Position target) {
-            return Util.AngleRadToDegClipped(OrientTowardsInRad(target));
-        }
+        public int OrientTowardsInDeg(Position target) { return Util.AngleRadToDegClipped(OrientTowardsInRad(target)); }
 
         public double OrientTowardsInRad(Position target) {
-            double dx = target.GetXPos() - xPos;
-            double dy = target.GetYPos() - yPos;
+            var dx = target.XPos - XPos;
+            var dy = target.YPos - YPos;
 
             return Math.Atan2(dy, dx) + 2 * Math.PI;
         }
 
         public Position GetClosestPoint(Position target) {
-            double radius = target.GetRadius() + Constants.MIN_DISTANCE_FOR_CLOSEST_POINT;
-            double angleRad = target.OrientTowardsInRad(this);
+            var radius = target.Radius + Constants.MIN_DISTANCE_FOR_CLOSEST_POINT;
+            var angleRad = target.OrientTowardsInRad(this);
 
-            double x = target.GetXPos() + radius * Math.Cos(angleRad);
-            double y = target.GetYPos() + radius * Math.Sin(angleRad);
+            var x = target.XPos + radius * Math.Cos(angleRad);
+            var y = target.YPos + radius * Math.Sin(angleRad);
 
             return new Position(x, y);
         }
 
-        protected bool Equals(Position other) {
-            return xPos.Equals(other.xPos) && yPos.Equals(other.yPos);
-        }
+        protected bool Equals(Position other) { return XPos.Equals(other.XPos) && YPos.Equals(other.YPos); }
 
         public override bool Equals(object obj) {
             if (ReferenceEquals(null, obj)) return false;
             if (ReferenceEquals(this, obj)) return true;
-            if (obj.GetType() != this.GetType()) return false;
+            if (obj.GetType() != GetType()) return false;
             return Equals((Position) obj);
         }
 
         public override int GetHashCode() {
             unchecked {
-                return (xPos.GetHashCode() * 397) ^ yPos.GetHashCode();
+                return (XPos.GetHashCode() * 397) ^ YPos.GetHashCode();
             }
         }
 
         public static bool operator ==(Position left, Position right) { return Equals(left, right); }
         public static bool operator !=(Position left, Position right) { return !Equals(left, right); }
 
-        public override string ToString() {
-            return "Position(" + xPos + ", " + yPos + ")";
-        }
+        public override string ToString() { return "Position(" + XPos + ", " + YPos + ")"; }
     }
 }

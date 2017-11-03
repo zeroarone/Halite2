@@ -4,7 +4,7 @@ namespace Halite2.hlt
 {
     public class Ship : Entity
     {
-        public enum DockingStatus { Undocked = 0, Docking = 1, Docked = 2, Undocking = 3 }
+        
 
         private DockingStatus dockingStatus;
         private int dockedPlanet;
@@ -23,14 +23,16 @@ namespace Halite2.hlt
             this.weaponCooldown = weaponCooldown;
         }
 
-        public int GetWeaponCooldown()
-        {
-            return weaponCooldown;
+        public int WeaponCooldown {
+            get {
+                return weaponCooldown;
+            }
         }
 
-        public DockingStatus GetDockingStatus()
-        {
-            return dockingStatus;
+        public DockingStatus DockingStatus {
+            get {
+                return dockingStatus;
+            }
         }
 
         public int GetDockingProgress()
@@ -45,7 +47,7 @@ namespace Halite2.hlt
 
         public bool CanDock(Planet planet)
         {
-            return GetDistanceTo(planet) <= Constants.DOCK_RADIUS + planet.GetRadius();
+            return GetDistanceTo(planet) <= Constants.DOCK_RADIUS + planet.Radius;
         }
 
         public override string ToString()
@@ -59,22 +61,16 @@ namespace Halite2.hlt
                     "]";
         }
 
-        public void Claim(Planet planet){
+        public void Claim(){
             if(!claimed){
-                planet.AddShipClaim(this);
-                DebugLog.AddLog($"Ship: {GetId()} Claimed!");
+                DebugLog.AddLog($"Ship: {Id} Claimed!");
                 claimed = true;
             }
             else{
                 throw new Exception("Claimed already claimed entity.");
             }
         }
-
-        public void ClaimStateless(){
-            claimed = true;
-            DebugLog.AddLog($"Ship: {GetId()} Claimed For One Round!");
-        }
-
+        
         public bool Claimed{get{return claimed;}}
     }
 }
