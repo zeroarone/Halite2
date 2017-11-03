@@ -76,16 +76,9 @@ namespace Halite2
                             break;
                         case ClaimType.Expand:
                             if (planet.IsOwned && planet.Owner != map.MyPlayerId) {
-                                if (planet.Points < 0) {
-                                    claimsToRemove.Add(ship.Id);
-                                    continue;
-                                }
-                                var newMove = NavigateToAttack(map, planet, ship);
-                                if (newMove != null) {
-                                    claims[ship.Id].Move = newMove;
-                                }
-                                else {
-                                    claimsToRemove.Add(ship.Id);
+                                if (planet.Points > Constants.ATTACK_THRESHOLD)
+                                {
+                                    updatedMove = NavigateToAttack(map, planet, ship);
                                 }
                             }
                             else {
