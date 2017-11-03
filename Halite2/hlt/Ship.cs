@@ -4,46 +4,26 @@ namespace Halite2.hlt
 {
     public class Ship : Entity
     {
-        
-
-        private DockingStatus dockingStatus;
-        private int dockedPlanet;
-        private int dockingProgress;
-        private int weaponCooldown;
-        private bool claimed;
-
         public Ship(int owner, int id, double xPos, double yPos,
                     int health, DockingStatus dockingStatus, int dockedPlanet,
                     int dockingProgress, int weaponCooldown)
             : base(owner, id, xPos, yPos, health, Constants.SHIP_RADIUS)
         {
-            this.dockingStatus = dockingStatus;
-            this.dockedPlanet = dockedPlanet;
-            this.dockingProgress = dockingProgress;
-            this.weaponCooldown = weaponCooldown;
+            this.DockingStatus = dockingStatus;
+            this.DockedPlanet = dockedPlanet;
+            this.DockingProgress = dockingProgress;
+            this.WeaponCooldown = weaponCooldown;
         }
 
-        public int WeaponCooldown {
-            get {
-                return weaponCooldown;
-            }
-        }
+        public int WeaponCooldown { get; }
 
-        public DockingStatus DockingStatus {
-            get {
-                return dockingStatus;
-            }
-        }
+        public DockingStatus DockingStatus { get; }
 
-        public int GetDockingProgress()
-        {
-            return dockingProgress;
-        }
+        public int DockingProgress { get; }
 
-        public int GetDockedPlanet()
-        {
-            return dockedPlanet;
-        }
+        public int DockedPlanet { get; }
+        
+        public ClaimType Claim { get; set; }
 
         public bool CanDock(Planet planet)
         {
@@ -54,23 +34,11 @@ namespace Halite2.hlt
         {
             return "Ship[" +
                     base.ToString() +
-                    ", dockingStatus=" + dockingStatus +
-                    ", dockedPlanet=" + dockedPlanet +
-                    ", dockingProgress=" + dockingProgress +
-                    ", weaponCooldown=" + weaponCooldown +
+                    ", dockingStatus=" + DockingStatus +
+                    ", dockedPlanet=" + DockedPlanet +
+                    ", dockingProgress=" + DockingProgress +
+                    ", weaponCooldown=" + WeaponCooldown +
                     "]";
         }
-
-        public void Claim(){
-            if(!claimed){
-                DebugLog.AddLog($"Ship: {Id} Claimed!");
-                claimed = true;
-            }
-            else{
-                throw new Exception("Claimed already claimed entity.");
-            }
-        }
-        
-        public bool Claimed{get{return claimed;}}
     }
 }

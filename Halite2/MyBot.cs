@@ -16,8 +16,7 @@ namespace Halite2
 
                 var networking = new Networking();
                 var gameMap = networking.Initialize(name);
-
-                var moveList = new List<Move>();
+                
                 var sortedPlanets = new List<Planet>();
                 claims = new Dictionary<int, Claim>();
                 claimedPorts = new Dictionary<int, int>();
@@ -25,7 +24,6 @@ namespace Halite2
                 var step = 0;
                 while(true) {
                     DebugLog.AddLog($"New Move: {step++}----------------------------------------------------------------------");
-                    moveList.Clear();
                     gameMap.UpdateMap(Networking.ReadLineIntoMetadata());
 
                     sortedPlanets.Clear();
@@ -37,12 +35,13 @@ namespace Halite2
                             planet.Points += planet.DockingSpots/ ship.Value * (ship.Key.Owner == gameMap.MyPlayerId ? 1 : -1);
                         planet.ShipsByDistance = gameMap.NearbyEntitiesByDistance(planet).Where(e => e.Key.GetType() == typeof(Ship) && e.Key.Owner == gameMap.MyPlayerId).OrderBy(kvp => kvp.Value).ToList();
                     }
-
+                    
                     sortedPlanets.Sort(PlanetComparer);
 
-                    CalculateMoves(sortedPlanets, moveList, gameMap);
+                    RunStatefulMoves(sortedPlanets, gameMap, claimedPorts);
+                    CalculateMoves(sortedPlanets, gameMap);
 
-                    Networking.SendMoves(moveList);
+                    Networking.SendMoves(claims.Values.Select(v => v.Move));
                 }
             }
             catch (Exception ex) {
@@ -51,35 +50,118 @@ namespace Halite2
             }
         }
 
+        private static void RunStatefulMoves(List<Planet> planets, GameMap map, Dictionary<int, int> ports) {
+            // Handle statefulness here
+            List<int> claimsToRemove = new List<int>();
+            foreach (var kvp in claims) {
+                var ship = map.GetShip(kvp.Key);
+                var claim = kvp.Value;
+                var planet = map.GetPlanet(claim.PlanetId);
+
+                if (ship == null) {
+                    claimsToRemove.Add(kvp.Key);
+                }
+                else {
+                    ship.Claim = claim.Type;
+
+                    Move updatedMove = null;
+                    switch (claim.Type) {
+                        case ClaimType.Attack:
+                            if (planet.IsOwned) {
+                                if(planet.Points > Constants.ATTACK_THRESHOLD || planets.All(p => p.Points <= Constants.ATTACK_THRESHOLD))
+                                    updatedMove = NavigateToAttack(map, planet, ship);
+                            }
+                            else
+                                claimsToRemove.Add(ship.Id);
+                            break;
+                        case ClaimType.Expand:
+                            if (planet.IsOwned && planet.Owner != map.MyPlayerId) {
+                                if (planet.Points < 0) {
+                                    claimsToRemove.Add(ship.Id);
+                                    continue;
+                                }
+                                var newMove = NavigateToAttack(map, planet, ship);
+                                if (newMove != null) {
+                                    claims[ship.Id].Move = newMove;
+                                }
+                                else {
+                                    claimsToRemove.Add(ship.Id);
+                                }
+                            }
+                            else {
+                                updatedMove = NavigateToDock(map, planet, ship);
+                                ports[planet.Id]++;
+                            }
+                            break;
+                        case ClaimType.Defend:
+                            break;
+                    }
+
+                    if (updatedMove != null) {
+                        claim.Move = updatedMove;
+                    }
+                    else {
+                        claimsToRemove.Add(ship.Id);
+                    }
+                }
+            }
+            foreach (var shipId in claimsToRemove) {
+                claims.Remove(shipId);
+                var ship = map.GetShip(shipId);
+                if (ship != null) {
+                    ship.Claim = ClaimType.None;
+                }
+            }
+        }
+
         private static int PlanetComparer(Planet p1, Planet p2) { return p2.Points.CompareTo(p1.Points); }
 
-        private static void CalculateMoves(List<Planet> sortedPlanets, List<Move> moveList, GameMap map) {
+        private static void CalculateMoves(List<Planet> sortedPlanets, GameMap map) {
             //Defend
-            //Counter interrupted docking
+            //Counter interrupted docking is done in the stateful moves above.
             //Expand
             var planet = sortedPlanets.FirstOrDefault(p => {
                 var unclaimedPorts = p.GetAvailableDockingPorts(map.MyPlayerId);
                 unclaimedPorts -= claimedPorts[p.Id];
-                return unclaimedPorts > 0;
+                return unclaimedPorts > 0 && p.GetClosestUnclaimedShip(ClaimType.Expand) != null;
             });
             if (planet != null) {
                 var newMove = NavigateToDock(map, planet);
                 if (newMove != null) {
-                    claims[newMove.Ship.Id] = new Claim(planet.Id, ClaimType.Expand);
+                    DebugLog.AddLog("Move found, expanding.");
+                    claims[newMove.Ship.Id] = new Claim(planet.Id, ClaimType.Expand, newMove);
                     claimedPorts[planet.Id]++;
-                    newMove.Ship.Claim();
-                    moveList.Add(newMove);
-                    CalculateMoves(sortedPlanets, moveList, map);
+                    newMove.Ship.Claim = ClaimType.Expand;
+                    CalculateMoves(sortedPlanets, map);
                 }
             }
             //Attack
+            var attackPlanets = sortedPlanets.Where(p => p.IsOwned && !p.IsOwnedBy(map.MyPlayerId));
+            planet = attackPlanets.FirstOrDefault(p => p.Points > Constants.ATTACK_THRESHOLD);
+            if (planet == null)
+                planet = attackPlanets.FirstOrDefault();
+
+            if (planet != null) {
+                var newMove = NavigateToAttack(map, planet);
+                if (newMove != null) {
+                    DebugLog.AddLog("Move found, attacking.");
+                    claims[newMove.Ship.Id] = new Claim(planet.Id, ClaimType.Attack, newMove);
+                    newMove.Ship.Claim = ClaimType.Attack;
+                    CalculateMoves(sortedPlanets, map);
+                }
+            }
         }
 
-        private static Move NavigateToDock(GameMap map, Planet planet) {
-            var ship = planet.GetClosestUnclaimedShip;
-
+        private static Move NavigateToDock(GameMap map, Planet planet, Ship ship = null) {
+            if(ship == null)
+                ship = planet.GetClosestUnclaimedShip(ClaimType.Expand);
+            else {
+                DebugLog.AddLog($"Docking with already docking ship.");
+            }
+            
             if (ship == null)
                 return null;
+            DebugLog.AddLog($"Docking planet {planet.Id} with ship {ship.Id}");
 
             if (ship.CanDock(planet)) {
                 return new DockMove(ship, planet);
@@ -90,36 +172,41 @@ namespace Halite2
             return Navigation.NavigateShipToDock(map, ship, planet, Constants.MAX_SPEED, clockwise);
         }
 
-        private static void NavigateToAttack(List<Planet> unOwnedPlanets, List<Move> moveList, GameMap map) {
-            foreach (var planetToAttack in unOwnedPlanets)
-            foreach (var ship in planetToAttack.ShipsByDistance.Where(s => !((Ship) s.Key).Claimed).Select(s => (Ship) s.Key)) {
-                if (ship == null) break;
+        private static Move NavigateToAttack(GameMap map, Planet planet, Ship ship = null) {
+            if (ship == null)
+                ship = planet.GetClosestUnclaimedShip(ClaimType.Attack);
+            else {
+                DebugLog.AddLog($"Attacking with already attacking ship: {ship.Id}");
+            }
 
-                var closestShipDistance = Double.MaxValue;
-                Ship closestShip = null;
-                foreach (var dockedShip in planetToAttack.DockedShips.Select(s => map.GetShip(s))) {
-                    var shipDistance = ship.GetDistanceTo(dockedShip);
-                    if (shipDistance < closestShipDistance) {
-                        closestShipDistance = shipDistance;
-                        closestShip = dockedShip;
-                    }
-                }
+            if (ship == null)
+                return null;
+            DebugLog.AddLog($"Attacking planet {planet.Id} with ship {ship.Id}");
 
-                if (closestShipDistance < Constants.WEAPON_RADIUS / 2) {
-                    moveList.Add(new Move(MoveType.Noop, ship));
-                }
-                else {
-                    var goLeft = ShouldGoClockwise(map, ship, closestShip);
-
-                    var newThrustMove = Navigation.NavigateShipTowardsTarget(map, ship,
-                        closestShip, Math.Min(Constants.MAX_SPEED, (int) Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS / 2, 1))), true, Constants.MAX_NAVIGATION_CORRECTIONS,
-                        Math.PI / 180.0 * (goLeft ? -1 : 1));
-                    if (newThrustMove != null) {
-                        ship.Claim();
-                        moveList.Add(newThrustMove);
-                    }
+            var closestShipDistance = Double.MaxValue;
+            Ship closestShip = null;
+            foreach (var dockedShip in planet.DockedShips.Select(s => map.GetShip(s))) {
+                var shipDistance = ship.GetDistanceTo(dockedShip);
+                if (shipDistance < closestShipDistance) {
+                    closestShipDistance = shipDistance;
+                    closestShip = dockedShip;
                 }
             }
+
+            if (closestShipDistance < Constants.WEAPON_RADIUS / 2) {
+                return new Move(MoveType.Noop, ship);
+            }
+            var clockwise = ShouldGoClockwise(map, ship, closestShip);
+
+            Move move = Navigation.NavigateShipTowardsTarget(map, ship, closestShip, Math.Min(Constants.MAX_SPEED, 
+                (int) Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS / 2, 1))), true, Constants.MAX_NAVIGATION_CORRECTIONS, Math.PI / 180.0 * (clockwise ? -1 : 1));
+
+            if (move == null) {
+                DebugLog.AddLog("NOOP, Trying to attack.");
+                move = new Move(MoveType.Noop, ship);
+            }
+
+            return move;
         }
 
         private static void NavigateToDefend(Dictionary<Planet, int> beingAttacked, Planet planetToDefend, List<Planet> ownedPlanets, List<Planet> unOwnedPlanets, List<Move> moveList, GameMap map, bool makeNextMove = true, Ship ship = null) {

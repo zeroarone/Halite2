@@ -25,21 +25,23 @@ namespace Halite2.hlt
             DockedShips = dockedShips;
         }
 
-        public Ship GetClosestUnclaimedShip {
-            get {
-                var shipWithDistance = GetClosestUnclaimedShipAndDistance;
-                if (shipWithDistance.Value == 0) return null;
-                return (Ship) shipWithDistance.Key;
-            }
+        public Ship GetClosestUnclaimedShip(ClaimType claimType) {
+            var shipWithDistance = GetClosestUnclaimedShipAndDistance(claimType);
+            if (shipWithDistance.Value == 0) return null;
+            return (Ship) shipWithDistance.Key;
         }
 
-        private KeyValuePair<Entity, double> GetClosestUnclaimedShipAndDistance {
-            get {
-                return ShipsByDistance.FirstOrDefault(s => {
-                    var ship = (Ship) s.Key;
-                    return ship.DockingStatus == DockingStatus.Undocked && !ship.Claimed;
-                });
-            }
+        private KeyValuePair<Entity, double> GetClosestUnclaimedShipAndDistance(ClaimType claimType) {
+            return ShipsByDistance.FirstOrDefault(s => {
+                var ship = (Ship) s.Key;
+                if (claimType == ClaimType.Expand) {
+                    var timeToTravel = (ship.GetDistanceTo(ship.GetClosestPoint(this)) - Constants.DOCK_RADIUS) / Constants.MAX_SPEED;
+                    if (timeToTravel >= FramesToNextSpawn) {
+                        return false;
+                    }
+                }
+                return ship.DockingStatus == DockingStatus.Undocked && claimType > ship.Claim;
+            });
         }
 
         public int FramesToNextSpawn => DockedShips.Count == 0 ? Int32.MaxValue : (int)Math.Ceiling(((double)Constants.RESOURCES_FOR_SHIP_PRODUCTION - CurrentProduction) / (Constants.BASE_PRODUCTIVITY * DockedShips.Count));

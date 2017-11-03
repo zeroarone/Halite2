@@ -57,5 +57,7 @@ namespace Halite2.hlt
          * Minimum distance specified from the object's outer radius.
          */
         public static int MIN_DISTANCE_FOR_CLOSEST_POINT = 3;
+
+        public static double ATTACK_THRESHOLD = 0;
     }
 }
