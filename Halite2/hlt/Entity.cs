@@ -9,6 +9,7 @@ namespace Halite2.hlt
         public int Owner { get; }
         public int Health { get; }
         public override double Radius => radius;
+        public bool IsOwnedBy(int player) { return Owner == player; }
 
         public Entity(int owner, int id, double xPos, double yPos, int health, double radius) : base(xPos, yPos) {
             Owner = owner;

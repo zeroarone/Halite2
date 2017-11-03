@@ -46,12 +46,22 @@ namespace Halite2.hlt
 
         public int FramesToNextSpawn => DockedShips.Count == 0 ? Int32.MaxValue : (int)Math.Ceiling(((double)Constants.RESOURCES_FOR_SHIP_PRODUCTION - CurrentProduction) / (Constants.BASE_PRODUCTIVITY * DockedShips.Count));
 
-        public bool IsOwnedBy(int player) { return Owner == player; }
-
         public int GetAvailableDockingPorts(int playerId) {
             if (IsOwnedBy(playerId) || !IsOwned)
                 return DockingSpots - DockedShips.Count;
             return 0;
+        }
+
+        public void AlterPoints(Claim claim){
+            var thrustMove = claim.Move as ThrustMove;
+            if(thrustMove == null)
+                return;
+
+            Points -= DockingSpots / GetDistanceTo(claim.Move.Ship);
+            var x = thrustMove.Thrust * Math.Cos(thrustMove.Angle * Math.PI/180);
+            var y = thrustMove.Thrust * Math.Sin(thrustMove.Angle * Math.PI/180);
+            var position = new Position(claim.Move.Ship.XPos + x, claim.Move.Ship.YPos + y);
+            Points += DockingSpots / GetDistanceTo(position);
         }
 
         public override string ToString() {

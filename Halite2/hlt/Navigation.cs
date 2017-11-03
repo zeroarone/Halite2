@@ -46,37 +46,5 @@ namespace Halite2.hlt
 
             return new ThrustMove(ship, angleDeg, thrust);
         }
-
-        public static ThrustMove CrashIntoOpposingPlanets(
-            GameMap gameMap,
-            Ship ship,
-            Position targetPos,
-            int maxThrust,
-            int maxCorrections,
-            double angularStepRad) {
-            if (maxCorrections <= 0)
-                return null;
-
-            var distance = ship.GetDistanceTo(targetPos);
-            var angleRad = ship.OrientTowardsInRad(targetPos);
-
-            if (gameMap.ObjectsBetween(ship, targetPos).Any(o => o.Owner == ship.Owner)) {
-                var newTargetDx = Math.Cos(angleRad + angularStepRad) * distance;
-                var newTargetDy = Math.Sin(angleRad + angularStepRad) * distance;
-                var newTarget = new Position(ship.XPos+ newTargetDx, ship.YPos+ newTargetDy);
-
-                return CrashIntoOpposingPlanets(gameMap, ship, newTarget, maxThrust, maxCorrections - 1, angularStepRad);
-            }
-
-            int thrust;
-            if (distance < maxThrust)
-                thrust = (int) distance;
-            else
-                thrust = maxThrust;
-
-            var angleDeg = Util.AngleRadToDegClipped(angleRad);
-
-            return new ThrustMove(ship, angleDeg, thrust);
-        }
     }
 }

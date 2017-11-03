@@ -87,6 +87,9 @@ namespace Halite2
                             }
                             break;
                         case ClaimType.Defend:
+                            if(planet.IsOwnedBy(map.MyPlayerId)){
+                                updatedMove = NavigateToDefend(map, planet, ship);
+                            }
                             break;
                     }
 
@@ -111,9 +114,22 @@ namespace Halite2
 
         private static void CalculateMoves(List<Planet> sortedPlanets, GameMap map) {
             //Defend
+            var planet = sortedPlanets.FirstOrDefault(p => p.IsOwnedBy(map.MyPlayerId) && p.Points <=0);
+            if(planet != null){
+                var newMove = NavigateToDefend(map, planet);
+                if (newMove != null) {
+                    DebugLog.AddLog("Move found, defending.");
+                    var claim = new Claim(planet.Id, ClaimType.Defend, newMove);
+                    claims[newMove.Ship.Id] = claim;
+                    planet.AlterPoints(claim);
+                    newMove.Ship.Claim = ClaimType.Defend;
+                    CalculateMoves(sortedPlanets, map);
+                }
+            }
+
             //Counter interrupted docking is done in the stateful moves above.
             //Expand
-            var planet = sortedPlanets.FirstOrDefault(p => {
+            planet = sortedPlanets.FirstOrDefault(p => {
                 var unclaimedPorts = p.GetAvailableDockingPorts(map.MyPlayerId);
                 unclaimedPorts -= claimedPorts[p.Id];
                 return unclaimedPorts > 0 && p.GetClosestUnclaimedShip(ClaimType.Expand) != null;
@@ -202,39 +218,26 @@ namespace Halite2
             return move;
         }
 
-        private static void NavigateToDefend(Dictionary<Planet, int> beingAttacked, Planet planetToDefend, List<Planet> ownedPlanets, List<Planet> unOwnedPlanets, List<Move> moveList, GameMap map, bool makeNextMove = true, Ship ship = null) {
-            //if (ship == null)
-            //    ship = planetToDefend.GetClosestUnclaimedShip;
+        private static Move NavigateToDefend(GameMap map, Planet planet, Ship ship = null) {
+            if (ship == null)
+               ship = planet.GetClosestUnclaimedShip(ClaimType.Defend);
 
-            //if (ship == null)
-            //    return;
+            if (ship == null)
+               return null;
 
-            //beingAttacked[planetToDefend]--;
+            var closestShip = (Ship) map.NearbyEntitiesByDistance(planet).OrderBy(kvp => kvp.Value).First(kvp => !kvp.Key.IsOwnedBy(map.MyPlayerId) && kvp.Key is Ship).Key;
+            var closestShipDistance = ship.GetDistanceTo(closestShip);
 
-            //var closestShip = (Ship) planetToDefend.NearbyEnemies.FirstOrDefault().Key;
-            //if (closestShip == null) {
-            //    DebugLog.AddLog("ERROR: No closest ship!");
-            //    return;
-            //}
+            if (closestShipDistance < Constants.WEAPON_RADIUS / 1) {
+               return new Move(MoveType.Noop, ship);
+            }
+            else {
+               var clockwise = ShouldGoClockwise(map, ship, closestShip);
 
-            //var closestShipDistance = ship.GetDistanceTo(closestShip);
-
-            //if (closestShipDistance < ship.Radius) {
-            //    moveList.Add(new Move(MoveType.Noop, ship));
-            //}
-            //else {
-            //    var goLeft = ShouldGoClockwise(map, ship, closestShip);
-
-            //    var newThrustMove = Navigation.NavigateShipTowardsTarget(map, ship,
-            //        closestShip, Math.Min(Constants.MAX_SPEED, (int) Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS / 2, 1))), true, Constants.MAX_NAVIGATION_CORRECTIONS,
-            //        Math.PI / 180.0 * (goLeft ? -1 : 1));
-            //    if (newThrustMove != null) moveList.Add(newThrustMove);
-            //}
-
-            //if (makeNextMove) {
-            //    ship.Claim();
-            //    CalculateMoves(ownedPlanets, moveList, map);
-            //}
+               return Navigation.NavigateShipTowardsTarget(map, ship,
+                   closestShip, Math.Min(Constants.MAX_SPEED, (int) Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS / 2, 1))), true, Constants.MAX_NAVIGATION_CORRECTIONS,
+                   Math.PI / 180.0 * (clockwise ? -1 : 1));               
+            }
         }
 
         private static bool ShouldGoClockwise(GameMap map, Ship ship, Position target) {
