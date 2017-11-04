@@ -9,6 +9,7 @@ namespace Halite2
     {
         static Dictionary<int, Claim> claims;
         private static Dictionary<int, int> claimedPorts;
+        private static List<Move> moveList;
 
         public static void Main(string[] args) {
             try {
@@ -17,7 +18,7 @@ namespace Halite2
                 var networking = new Networking();
                 var gameMap = networking.Initialize(name);
                 
-                var moveList = new List<Move>();
+                moveList = new List<Move>();
                 var sortedPlanets = new List<Planet>();
                 claims = new Dictionary<int, Claim>();
                 claimedPorts = new Dictionary<int, int>();
@@ -58,27 +59,8 @@ namespace Halite2
                     
                     RunStatefulMoves(sortedPlanets, gameMap, claimedPorts);
                     CalculateMoves(sortedPlanets, gameMap);
-
-                    foreach(Claim claim in claims.Values){
-                        if(claim.Move.Type == MoveType.Thrust && ((ThrustMove)claim.Move).Thrust > 0){
-                            // if(step == 30){
-                            //     DebugLog.AddLog($"\tShip:{claim.Move.Ship.Id}: {claim.NewPosition}");
-                            // }
-                            var thrustMove = (ThrustMove)claim.Move;
-                            foreach(var other in claims.Values.Where(c => c != claim)){                                
-                                // if(step == 30)
-                                //     DebugLog.AddLog($"{claim.NewPosition.GetDistanceTo(other.NewPosition)}");
-                                var changed = false;
-                                while(Util.doLinesIntersect(new LineSegment(claim.Move.Ship, claim.NewPosition), new LineSegment(other.Move.Ship, other.NewPosition)) || claim.NewPosition.GetDistanceTo(other.NewPosition) < Constants.SHIP_RADIUS + Constants.FORECAST_FUDGE_FACTOR * 2 & thrustMove.Thrust > 0){
-                                    changed = true;
-                                    thrustMove = new ThrustMove(thrustMove.Ship, thrustMove.Angle, thrustMove.Thrust - 1);
-                                    claim.Move = thrustMove;
-                                }
-                                if(changed) break;
-                            }
-                        }
-                        moveList.Add(claim.Move);
-                    }
+                    AvoidCollisions();
+                    
 
                     Networking.SendMoves(moveList);
                 }
@@ -149,6 +131,29 @@ namespace Halite2
             }
         }
 
+        private static void AvoidCollisions(){
+            foreach(Claim claim in claims.Values){
+                if(claim.Move.Type == MoveType.Thrust && ((ThrustMove)claim.Move).Thrust > 0){
+                    // if(step == 30){
+                    //     DebugLog.AddLog($"\tShip:{claim.Move.Ship.Id}: {claim.NewPosition}");
+                    // }
+                    var thrustMove = (ThrustMove)claim.Move;
+                    foreach(var other in claims.Values.Where(c => c != claim)){                                
+                        // if(step == 30)
+                        //     DebugLog.AddLog($"{claim.NewPosition.GetDistanceTo(other.NewPosition)}");
+                        var changed = false;
+                        while(Util.doLinesIntersect(new LineSegment(claim.Move.Ship, claim.NewPosition), new LineSegment(other.Move.Ship, other.NewPosition)) || claim.NewPosition.GetDistanceTo(other.NewPosition) < Constants.SHIP_RADIUS + Constants.FORECAST_FUDGE_FACTOR * 2 & thrustMove.Thrust > 1){
+                            changed = true;
+                            thrustMove = new ThrustMove(thrustMove.Ship, thrustMove.Angle, thrustMove.Thrust - 1);
+                            claim.Move = thrustMove;
+                        }
+                        if(changed) break;
+                    }
+                }
+                moveList.Add(claim.Move);
+            }
+        }
+
         private static int PlanetComparer(Planet p1, Planet p2) { 
             return p2.Points.CompareTo(p1.Points); }
 
@@ -188,17 +193,15 @@ namespace Halite2
             }
             //Attack
             var attackPlanets = sortedPlanets.Where(p => p.IsOwned && !p.IsOwnedBy(map.MyPlayerId));
-            planet = attackPlanets.FirstOrDefault(p => p.Points > Constants.ATTACK_THRESHOLD);
-            if (planet == null)
-                planet = attackPlanets.FirstOrDefault();
-
-            if (planet != null) {
+            foreach(var planetToAttack in attackPlanets){
+                planet = planetToAttack;
                 var newMove = NavigateToAttack(map, planet);
                 if (newMove != null) {
                     claims[newMove.Ship.Id] = new Claim(planet.Id, ClaimType.Attack, newMove);
                     newMove.Ship.Claim = ClaimType.Attack;
                     planet.Points -= planet.DockingSpots / newMove.Ship.GetDistanceTo(planet);
                     CalculateMoves(sortedPlanets, map);
+                    break;
                 }
             }
         }
@@ -248,8 +251,9 @@ namespace Halite2
             Move move = Navigation.NavigateShipTowardsTarget(map, ship, closestShip, Math.Min(Constants.MAX_SPEED, 
                 (int) Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS / 2, 1))), true, Constants.MAX_NAVIGATION_CORRECTIONS, Math.PI / 180.0 * (clockwise ? -1 : 1));
 
+            // TODO: Don't stop, try to find a new target for this ship.
             if (move == null) {
-                move = new Move(MoveType.Noop, ship);
+                return null;
             }
 
             return move;
