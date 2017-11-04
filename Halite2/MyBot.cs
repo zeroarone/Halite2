@@ -37,22 +37,11 @@ namespace Halite2
                         planet.ShipsByDistance = gameMap.NearbyEntitiesByDistance(planet).Where(e => e.Key.GetType() == typeof(Ship) && e.Key.Owner == gameMap.MyPlayerId).OrderBy(kvp => kvp.Value).ToList();
 
                         if(planet.IsOwnedBy(gameMap.MyPlayerId)){
-                            var enemies = gameMap.NearbyEntitiesByDistance(planet).Where(e => e.Key.Owner != -1 && e.Key.Owner != gameMap.MyPlayerId).OrderBy(e => e.Value).GroupBy(g => g.Key.Owner);
-                            foreach(var enemyGroups in enemies){
-                                if(enemyGroups.Any(e => e.Key is Planet)){
-                                    var closestPlanet = enemyGroups.FirstOrDefault(e => e.Key is Planet).Value;
-                                    foreach(var ship in enemyGroups.Where(e => e.Key is Ship && ((Ship)e.Key).DockingStatus == DockingStatus.Undocked)){
-                                        if(ship.Value < closestPlanet / 4){
-                                            planet.Attackers.Add((Ship)ship.Key);
-                                        }
-                                    }
-                                }
-                            }
+                             var enemies = gameMap.NearbyEntitiesByDistance(planet).Where(e => e.Key.Owner != -1 && e.Key.Owner != gameMap.MyPlayerId).OrderBy(e => e.Value);
+                             planet.Attackers = enemies.Where(e => e.Key is Ship && e.Value < Constants.WEAPON_RADIUS * 2).Select(s => s.Key).Cast<Ship>().ToList();
                         }
                     }
                     
-                    sortedPlanets.Sort(PlanetComparer);
-
                     RunStatefulMoves(sortedPlanets, gameMap, claimedPorts);
                     CalculateMoves(sortedPlanets, gameMap);
 
@@ -125,9 +114,12 @@ namespace Halite2
             }
         }
 
-        private static int PlanetComparer(Planet p1, Planet p2) { return p2.Points.CompareTo(p1.Points); }
+        private static int PlanetComparer(Planet p1, Planet p2) { 
+            return p1.ShipsByDistance.First().Value.CompareTo(p2.ShipsByDistance.First().Value); }
 
         private static void CalculateMoves(List<Planet> sortedPlanets, GameMap map) {
+            sortedPlanets.Sort(PlanetComparer);
+
             //Defend
             var planet = sortedPlanets.FirstOrDefault(p => p.Attackers.Count > p.Defenders / 2);
             if(planet != null){
