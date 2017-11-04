@@ -35,15 +35,24 @@ namespace Halite2
                         claimedPorts[planet.Id] = 0;
                         sortedPlanets.Add(planet);
                         var entities = gameMap.NearbyEntitiesByDistance(planet);
-                        // foreach (var otherPlanet in entities.Where(e => e.Key.GetType() == typeof(Planet) && !((Planet) e.Key).IsOwned))
-                        //     planet.Points += ((Planet)otherPlanet.Key).DockingSpots / otherPlanet.Value;
+                        foreach (var otherPlanet in entities.Where(e => e.Key.GetType() == typeof(Planet) && !((Planet) e.Key).IsOwned))
+                            planet.Points += ((Planet)otherPlanet.Key).DockingSpots / otherPlanet.Value;
                         foreach (var ship in entities.Where(e => e.Key.GetType() == typeof(Ship) && ((Ship) e.Key).DockingStatus == DockingStatus.Undocked))
                             planet.Points += planet.DockingSpots / ship.Value * (ship.Key.Owner == gameMap.MyPlayerId ? 1 : -1);
                         planet.ShipsByDistance = gameMap.NearbyEntitiesByDistance(planet).Where(e => e.Key.GetType() == typeof(Ship) && e.Key.Owner == gameMap.MyPlayerId).OrderBy(kvp => kvp.Value).ToList();
 
                         if(planet.IsOwnedBy(gameMap.MyPlayerId)){
-                             var enemies = entities.Where(e => e.Key.Owner != -1 && e.Key.Owner != gameMap.MyPlayerId).OrderBy(e => e.Value);
-                             planet.Attackers = enemies.Where(e => e.Key is Ship && e.Value < Constants.WEAPON_RADIUS + 1).Select(s => s.Key).Cast<Ship>().ToList();
+                            var dockedShips = planet.DockedShips.Select(d => gameMap.GetShip(d));
+                            var enemies = entities.Where(e => e.Key.Owner != -1 && e.Key.Owner != gameMap.MyPlayerId && e.Key is Ship && e.Value < Constants.WEAPON_RADIUS * 3).OrderBy(e => e.Value);
+                            HashSet<Entity> enemyShips = new HashSet<Entity>();
+                            foreach(var ds in dockedShips){
+                                foreach(var enemy in enemies.Where(e => !enemyShips.Contains(e.Key))){
+                                    if(ds.GetDistanceTo(enemy.Key) < Constants.WEAPON_RADIUS){
+                                        enemyShips.Add(enemy.Key);
+                                    }
+                                }
+                            }
+                            planet.Attackers = enemyShips.Cast<Ship>().ToList();
                         }
                     }
                     
@@ -141,7 +150,7 @@ namespace Halite2
         }
 
         private static int PlanetComparer(Planet p1, Planet p2) { 
-            return p1.ShipsByDistance.First().Value.CompareTo(p2.ShipsByDistance.First().Value); }
+            return p2.Points.CompareTo(p1.Points); }
 
         private static void CalculateMoves(List<Planet> sortedPlanets, GameMap map) {
             sortedPlanets.Sort(PlanetComparer);
@@ -188,6 +197,7 @@ namespace Halite2
                 if (newMove != null) {
                     claims[newMove.Ship.Id] = new Claim(planet.Id, ClaimType.Attack, newMove);
                     newMove.Ship.Claim = ClaimType.Attack;
+                    planet.Points -= planet.DockingSpots / newMove.Ship.GetDistanceTo(planet);
                     CalculateMoves(sortedPlanets, map);
                 }
             }
