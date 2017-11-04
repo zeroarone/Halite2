@@ -31,13 +31,19 @@ namespace Halite2
                     sortedPlanets.Clear();
                     moveList.Clear();
                     
+                    var ownAnyPlanets = gameMap.AllPlanets.Any(p => p.Value.IsOwnedBy(gameMap.MyPlayerId));
+
                     // TODO: Try to colonize planets that are close together first.
                     foreach (var planet in gameMap.AllPlanets.Select(kvp => kvp.Value)) {
                         claimedPorts[planet.Id] = 0;
                         sortedPlanets.Add(planet);
                         var entities = gameMap.NearbyEntitiesByDistance(planet);
-                        foreach (var otherPlanet in entities.Where(e => e.Key.GetType() == typeof(Planet))){
-                            planet.Points += 1 / (otherPlanet.Value * (otherPlanet.Key.Owner == gameMap.MyPlayerId || !((Planet)otherPlanet.Key).IsOwned ? 1 : -1));
+                        
+                        // Don't let this count for anything if we don't own any planets at all.
+                        if(ownAnyPlanets){
+                            foreach (var otherPlanet in entities.Where(e => e.Key.GetType() == typeof(Planet))){
+                                planet.Points += 1 / (otherPlanet.Value * (otherPlanet.Key.Owner == gameMap.MyPlayerId || !((Planet)otherPlanet.Key).IsOwned ? 1 : -1));
+                            }
                         }
                         foreach (var ship in entities.Where(e => e.Key.GetType() == typeof(Ship) && ((Ship) e.Key).DockingStatus == DockingStatus.Undocked))
                             planet.Points += 1 / ship.Value * (ship.Key.Owner == gameMap.MyPlayerId ? 1 : -1);
