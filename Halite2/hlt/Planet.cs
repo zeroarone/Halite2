@@ -38,6 +38,8 @@ namespace Halite2.hlt
             return ShipsByDistance.FirstOrDefault(s => {
                 var ship = (Ship) s.Key;
                 if (claimType == ClaimType.Expand) {
+                    if(ship.Health != Constants.MAX_SHIP_HEALTH)
+                        return false;
                     var timeToTravel = (ship.GetDistanceTo(ship.GetClosestPoint(this)) - Constants.DOCK_RADIUS) / Constants.MAX_SPEED;                    
                     //DebugLog.AddLog($"TTL: {timeToTravel}, FTNS: {FramesToNextSpawn}");
                     if (timeToTravel >= FramesToNextSpawn) {
