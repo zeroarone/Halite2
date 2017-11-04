@@ -38,7 +38,8 @@ namespace Halite2.hlt
             return ShipsByDistance.FirstOrDefault(s => {
                 var ship = (Ship) s.Key;
                 if (claimType == ClaimType.Expand) {
-                    var timeToTravel = (ship.GetDistanceTo(ship.GetClosestPoint(this)) - Constants.DOCK_RADIUS) / Constants.MAX_SPEED;
+                    var timeToTravel = (ship.GetDistanceTo(ship.GetClosestPoint(this)) - Constants.DOCK_RADIUS) / Constants.MAX_SPEED;                    
+                    //DebugLog.AddLog($"TTL: {timeToTravel}, FTNS: {FramesToNextSpawn}");
                     if (timeToTravel >= FramesToNextSpawn) {
                         return false;
                     }
@@ -55,17 +56,10 @@ namespace Halite2.hlt
             return 0;
         }
 
-        public void AlterPoints(Claim claim){
-            var thrustMove = claim.Move as ThrustMove;
-            if(thrustMove == null)
-                return;
-
-            Points -= DockingSpots / GetDistanceTo(claim.Move.Ship);
-            var x = thrustMove.Thrust * Math.Cos(thrustMove.Angle * Math.PI/180);
-            var y = thrustMove.Thrust * Math.Sin(thrustMove.Angle * Math.PI/180);
-            var position = new Position(claim.Move.Ship.XPos + x, claim.Move.Ship.YPos + y);
-            Points += DockingSpots / GetDistanceTo(position);
-        }
+        // public void AlterPoints(Claim claim){
+        //     Points -= DockingSpots / GetDistanceTo(claim.Move.Ship);
+        //     Points += DockingSpots / GetDistanceTo(claim.NewPosition);
+        // }
 
         public override string ToString() {
             return "Planet[" +
