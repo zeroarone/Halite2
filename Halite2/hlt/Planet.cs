@@ -14,6 +14,8 @@ namespace Halite2.hlt
         public double Points { get; set; }
         public int RemainingProduction { get; }
         public List<KeyValuePair<Entity, double>> ShipsByDistance { get; set; }
+        public List<Ship> Attackers { get;set; }
+        public int Defenders {get;set;}
 
         public Planet(int owner, int id, double xPos, double yPos, int health,
             double radius, int dockingSpots, int currentProduction,
@@ -23,6 +25,7 @@ namespace Halite2.hlt
             CurrentProduction = currentProduction;
             RemainingProduction = remainingProduction;
             DockedShips = dockedShips;
+            Attackers = new List<Ship>();
         }
 
         public Ship GetClosestUnclaimedShip(ClaimType claimType) {
