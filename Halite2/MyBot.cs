@@ -33,6 +33,7 @@ namespace Halite2
                     
                     var ownAnyPlanets = gameMap.AllPlanets.Any(p => p.Value.IsOwnedBy(gameMap.MyPlayerId));
 
+                    DebugLog.AddLog("Planet Points:");
                     // TODO: Try to colonize planets that are close together first.
                     foreach (var planet in gameMap.AllPlanets.Select(kvp => kvp.Value)) {
                         claimedPorts[planet.Id] = 0;
@@ -40,9 +41,9 @@ namespace Halite2
                         var entities = gameMap.NearbyEntitiesByDistance(planet);
                         
                         // Don't let this count for anything if we don't own any planets at all.
-                        if(ownAnyPlanets){
-                            foreach (var otherPlanet in entities.Where(e => e.Key.GetType() == typeof(Planet))){
-                                planet.Points += 1 / (otherPlanet.Value * (otherPlanet.Key.Owner == gameMap.MyPlayerId || !((Planet)otherPlanet.Key).IsOwned ? 1 : -1));
+                        if(ownAnyPlanets && (!planet.IsOwned || planet.IsOwnedBy(gameMap.MyPlayerId))){
+                            foreach (var otherPlanet in entities.Where(e => e.Key.GetType() == typeof(Planet) && ((Planet)e.Key).IsOwnedBy(gameMap.MyPlayerId))){
+                                planet.Points += 1 / otherPlanet.Value;
                             }
                         }
                         foreach (var ship in entities.Where(e => e.Key.GetType() == typeof(Ship) && ((Ship) e.Key).DockingStatus == DockingStatus.Undocked))
@@ -62,10 +63,12 @@ namespace Halite2
                             }
                             planet.Attackers = enemyShips.Cast<Ship>().ToList();
                         }
+                        DebugLog.AddLog($"\t{(planet.IsOwnedBy(gameMap.MyPlayerId) ? "*" : "")}{planet.Id}:{planet.Points}");
                     }
                     
                     RunStatefulMoves(sortedPlanets, gameMap, claimedPorts);
                     CalculateMoves(sortedPlanets, gameMap);
+                    MoveToDefensivePosition(sortedPlanets, gameMap);
                     AvoidCollisions();
                     
 
@@ -99,8 +102,6 @@ namespace Halite2
                                 if(planet.Points > Constants.ATTACK_THRESHOLD || planets.All(p => p.Points <= Constants.ATTACK_THRESHOLD))
                                     updatedMove = NavigateToAttack(map, planet, ship);
                             }
-                            else
-                                claimsToRemove.Add(ship.Id);
                             break;
                         case ClaimType.Expand:
                             if (planet.IsOwned && planet.Owner != map.MyPlayerId) {
@@ -109,7 +110,7 @@ namespace Halite2
                                     updatedMove = NavigateToAttack(map, planet, ship);
                                 }
                             }
-                            else if(ship.Health != Constants.MAX_SHIP_HEALTH){
+                            else if(ship.Health != Constants.MAX_SHIP_HEALTH || planet.Points < Constants.ATTACK_THRESHOLD){
                                 updatedMove = NavigateToDefend(map, planet, ship);
                             }
                             else {
@@ -141,6 +142,20 @@ namespace Halite2
             }
         }
 
+        private static void MoveToDefensivePosition(List<Planet> sortedPlanets, GameMap map){
+            var planet = sortedPlanets.LastOrDefault(p => p.IsOwnedBy(map.MyPlayerId));
+            if(planet != null){
+                foreach(var ship in map.MyPlayer.Ships.Where(s => !claims.ContainsKey(s.Value.Id)).Select(s => s.Value)){
+                    var newMove = NavigateToDefend(map, planet, ship);
+                    if (newMove != null) {
+                        var claim = new Claim(planet.Id, ClaimType.Defend, newMove);
+                        claims[newMove.Ship.Id] = claim;
+                        newMove.Ship.Claim = ClaimType.Defend;
+                    }
+                }
+            }
+        }
+
         private static void AvoidCollisions(){
             foreach(Claim claim in claims.Values){
                 if(claim.Move.Type == MoveType.Thrust && ((ThrustMove)claim.Move).Thrust > 0){
@@ -156,6 +171,7 @@ namespace Halite2
                         if(changed) break;
                     }
                 }
+                DebugLog.AddLog($"{claim.Move.Ship.Id}:{claim.Type}");
                 moveList.Add(claim.Move);
             }
         }
@@ -173,7 +189,6 @@ namespace Halite2
                 if (newMove != null) {
                     var claim = new Claim(planet.Id, ClaimType.Defend, newMove);
                     claims[newMove.Ship.Id] = claim;
-                    //planet.AlterPoints(claim);
                     newMove.Ship.Claim = ClaimType.Defend;
                     CalculateMoves(sortedPlanets, map);
                 }
@@ -198,14 +213,16 @@ namespace Halite2
                 }
             }
             //Attack
-            var attackPlanets = sortedPlanets.Where(p => p.IsOwned && !p.IsOwnedBy(map.MyPlayerId));
+            var attackPlanets = sortedPlanets.Where(p => p.IsOwned && !p.IsOwnedBy(map.MyPlayerId) && p.Points > Constants.ATTACK_THRESHOLD);
             foreach(var planetToAttack in attackPlanets){
                 planet = planetToAttack;
                 var newMove = NavigateToAttack(map, planet);
                 if (newMove != null) {
-                    claims[newMove.Ship.Id] = new Claim(planet.Id, ClaimType.Attack, newMove);
+                    var claim = new Claim(planet.Id, ClaimType.Attack, newMove);
+                    claims[newMove.Ship.Id] = claim;
                     newMove.Ship.Claim = ClaimType.Attack;
-                    planet.Points -= planet.DockingSpots / newMove.Ship.GetDistanceTo(planet);
+                    planet.Points -= 1 / newMove.Ship.GetDistanceTo(planet);
+                    planet.Points += 1 / claim.NewPosition.GetDistanceTo(planet);
                     CalculateMoves(sortedPlanets, map);
                     break;
                 }
