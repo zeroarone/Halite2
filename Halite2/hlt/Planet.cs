@@ -11,11 +11,14 @@ namespace Halite2.hlt
         public int DockingSpots { get; }
         public bool IsFull => DockedShips.Count == DockingSpots;
         public bool IsOwned => Owner != -1;
-        public double Points { get; set; }
+        public double AttackPoints { get; set; }
+        public double ExpansionPoints => AttackPoints;
         public int RemainingProduction { get; }
         public List<KeyValuePair<Entity, double>> ShipsByDistance { get; set; }
         public List<Ship> Attackers { get;set; }
         public int Defenders {get;set;}
+        public int FramesToNextSpawn => DockedShips.Count == 0 ? Int32.MaxValue : (int)Math.Ceiling(((double)Constants.RESOURCES_FOR_SHIP_PRODUCTION - CurrentProduction) / (Constants.BASE_PRODUCTIVITY * DockedShips.Count));
+        public int FramesToLive { get; set; }
 
         public Planet(int owner, int id, double xPos, double yPos, int health,
             double radius, int dockingSpots, int currentProduction,
@@ -38,7 +41,7 @@ namespace Halite2.hlt
             return ShipsByDistance.FirstOrDefault(s => {
                 var ship = (Ship) s.Key;
                 if (claimType == ClaimType.Expand) {
-                    if(ship.Health != Constants.MAX_SHIP_HEALTH)
+                    if(ship.Health <= Constants.DOCKING_SHIP_HEALTH)
                         return false;
                     var timeToTravel = (ship.GetDistanceTo(ship.GetClosestPoint(this)) - Constants.DOCK_RADIUS) / Constants.MAX_SPEED;                    
                     //DebugLog.AddLog($"TTL: {timeToTravel}, FTNS: {FramesToNextSpawn}");
@@ -46,11 +49,13 @@ namespace Halite2.hlt
                         return false;
                     }
                 }
+                if (claimType == ClaimType.Defend) {
+                    if (s.Value / Constants.MAX_SPEED > FramesToLive)
+                        return false;
+                }
                 return ship.DockingStatus == DockingStatus.Undocked && claimType > ship.Claim;
             });
         }
-
-        public int FramesToNextSpawn => DockedShips.Count == 0 ? Int32.MaxValue : (int)Math.Ceiling(((double)Constants.RESOURCES_FOR_SHIP_PRODUCTION - CurrentProduction) / (Constants.BASE_PRODUCTIVITY * DockedShips.Count));
 
         public int GetAvailableDockingPorts(int playerId) {
             if (IsOwnedBy(playerId) || !IsOwned)

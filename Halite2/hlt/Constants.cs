@@ -1,3 +1,5 @@
+using System.Net;
+
 namespace Halite2.hlt
 {
     public class Constants
@@ -15,6 +17,9 @@ namespace Halite2.hlt
 
         /** Starting health of ship, also its max */
         public static int MAX_SHIP_HEALTH = 255;
+
+        // Threshold for docking a ship
+        public static int DOCKING_SHIP_HEALTH = 127;
 
         /** Starting health of ship, also its max */
         public static int BASE_SHIP_HEALTH = 255;
@@ -59,5 +64,7 @@ namespace Halite2.hlt
         public static int MIN_DISTANCE_FOR_CLOSEST_POINT = 3;
 
         public static double ATTACK_THRESHOLD = .2;
+
+        public static double EXPANSION_THRESHOLD = 0;
     }
 }
