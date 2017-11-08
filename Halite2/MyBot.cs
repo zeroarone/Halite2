@@ -41,15 +41,15 @@ namespace Halite2
 
                         // Don't let this count for anything if we don't own any planets at all.
                         var allPlanets = entities.Where(e => e.Key.GetType() == typeof(Planet));
-                        // if (ownAnyPlanets) {
-                        //     foreach (var otherPlanet in allPlanets) {
-                        //         if (otherPlanet.Key.IsOwnedBy(map.MyPlayerId)) {
-                        //             planet.AttackPoints += ((Planet)otherPlanet.Key).DockedShips.Count / Math.Pow(otherPlanet.Value, 1);
-                        //         }
-                        //         else
-                        //             planet.AttackPoints += 1 / Math.Pow((otherPlanet.Value * (otherPlanet.Key.Owner == map.MyPlayerId || !((Planet) otherPlanet.Key).IsOwned ? 1 : -1)), 1);
-                        //     }
-                        // }
+                        if (ownAnyPlanets) {
+                            foreach (var otherPlanet in allPlanets) {
+                                if (otherPlanet.Key.IsOwnedBy(map.MyPlayerId)) {
+                                    planet.AttackPoints += ((Planet)otherPlanet.Key).DockedShips.Count / Math.Pow(otherPlanet.Value, 1);
+                                }
+                                else
+                                    planet.AttackPoints += 1 / Math.Pow((otherPlanet.Value * (otherPlanet.Key.Owner == map.MyPlayerId || !((Planet) otherPlanet.Key).IsOwned ? 1 : -1)), 1);
+                            }
+                        }
                         foreach (var ship in entities.Where(e => e.Key.GetType() == typeof(Ship))) {
                             var shipWeight = 1 / ship.Value * (ship.Key.Owner == map.MyPlayerId ? 1 : -1);
                             planet.AttackPoints += shipWeight;
@@ -167,20 +167,20 @@ namespace Halite2
 
         private static void AvoidCollisions() {
             foreach (Claim claim in claims.Values) {
-                if (claim.Move.Type == MoveType.Thrust && ((ThrustMove) claim.Move).Thrust > 0) {
-                   var thrustMove = (ThrustMove) claim.Move;
-                   foreach (var other in claims.Values.Where(c => c != claim)) {
-                       var changed = false;
-                       var newDistance = claim.Move.Ship.GetDistanceTo(other.Move.Ship);
-                       while (newDistance < 2 & thrustMove.Thrust > 1) {
-                           changed = true;
-                           thrustMove = new ThrustMove(thrustMove.Ship, thrustMove.Angle, thrustMove.Thrust - 1);
-                           claim.Move = thrustMove;
-                           newDistance = claim.Move.Ship.GetDistanceTo(other.Move.Ship);
-                       }
-                       if (changed) break;
-                   }
-                }
+                // if (claim.Move.Type == MoveType.Thrust && ((ThrustMove) claim.Move).Thrust > 0) {
+                //    var thrustMove = (ThrustMove) claim.Move;
+                //    foreach (var other in claims.Values.Where(c => c != claim)) {
+                //        var changed = false;
+                //        var newDistance = claim.Move.Ship.GetDistanceTo(other.Move.Ship);
+                //        while (newDistance < 2 & thrustMove.Thrust > 1) {
+                //            changed = true;
+                //            thrustMove = new ThrustMove(thrustMove.Ship, thrustMove.Angle, thrustMove.Thrust - 1);
+                //            claim.Move = thrustMove;
+                //            newDistance = claim.Move.Ship.GetDistanceTo(other.Move.Ship);
+                //        }
+                //        if (changed) break;
+                //    }
+                // }
                 moveList.Add(claim.Move);
             }
         }
