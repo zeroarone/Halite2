@@ -6,8 +6,8 @@ namespace Halite2.hlt
     {
         public virtual double Radius => 0;
 
-        public double XPos { get; }
-        public double YPos { get; }
+        public double XPos { get; set; }
+        public double YPos { get; set; }
 
         public Position(double xPos, double yPos) {
             XPos = xPos;

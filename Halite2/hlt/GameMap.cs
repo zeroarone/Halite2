@@ -41,8 +41,8 @@ namespace Halite2.hlt
 
         public Planet GetPlanet(int entityId) { return AllPlanets[entityId]; }
 
-        public List<Entity> ObjectsBetween(Position start, Position target) {
-            var entitiesFound = new List<Entity>();
+        public Dictionary<Entity, double> ObjectsBetween(Position start, Position target) {
+            var entitiesFound = new Dictionary<Entity, double>();
 
             AddEntitiesBetween(entitiesFound, start, target, AllPlanets.Values.ToList<Entity>());
             AddEntitiesBetween(entitiesFound, start, target, allShips.ToList<Entity>());
@@ -50,10 +50,11 @@ namespace Halite2.hlt
             return entitiesFound;
         }
 
-        private static void AddEntitiesBetween(List<Entity> entitiesFound, Position start, Position target, ICollection<Entity> entitiesToCheck) {
+        private static void AddEntitiesBetween(Dictionary<Entity, double> entitiesFound, Position start, Position target, ICollection<Entity> entitiesToCheck) {
             foreach (var entity in entitiesToCheck) {
                 if (entity.Equals(start) || entity.Equals(target)) continue;
-                if (Collision.SegmentCircleIntersect(start, target, entity, Constants.FORECAST_FUDGE_FACTOR)) entitiesFound.Add(entity);
+                var distance = Collision.SegmentCircleIntersect(start, target, entity, Constants.FORECAST_FUDGE_FACTOR);
+                if (distance >= 0) entitiesFound.Add(entity, distance);
             }
         }
 

@@ -143,19 +143,6 @@ namespace Halite2
 
         private static void AvoidCollisions(){
             foreach(Claim claim in claims.Values){
-                if(claim.Move.Type == MoveType.Thrust && ((ThrustMove)claim.Move).Thrust > 0){
-                    var thrustMove = (ThrustMove)claim.Move;
-                    foreach(var other in claims.Values.Where(c => c != claim)){
-                        var changed = false;
-                        var newDistance = claim.NewPosition.GetDistanceTo(other.NewPosition);
-                        while(Util.doLinesIntersect(new LineSegment(claim.Move.Ship, claim.NewPosition), new LineSegment(other.Move.Ship, other.NewPosition)) || newDistance < Constants.SHIP_RADIUS + Constants.FORECAST_FUDGE_FACTOR * 1.5 & thrustMove.Thrust > 1){
-                            changed = true;
-                            thrustMove = new ThrustMove(thrustMove.Ship, thrustMove.Angle, thrustMove.Thrust - 1);
-                            claim.Move = thrustMove;
-                        }
-                        if(changed) break;
-                    }
-                }
                 moveList.Add(claim.Move);
             }
         }
@@ -173,8 +160,9 @@ namespace Halite2
                 if (newMove != null) {
                     var claim = new Claim(planet.Id, ClaimType.Defend, newMove);
                     claims[newMove.Ship.Id] = claim;
-                    //planet.AlterPoints(claim);
                     newMove.Ship.Claim = ClaimType.Defend;
+                    newMove.Ship.XPos = claim.NewPosition.XPos;
+                    newMove.Ship.YPos = claim.NewPosition.YPos;
                     CalculateMoves(sortedPlanets, map);
                 }
             }
@@ -191,9 +179,12 @@ namespace Halite2
             if (planet != null) {
                 var newMove = NavigateToDock(map, planet);
                 if (newMove != null) {
-                    claims[newMove.Ship.Id] = new Claim(planet.Id, ClaimType.Expand, newMove);
+                    var claim = new Claim(planet.Id, ClaimType.Expand, newMove);
+                    claims[newMove.Ship.Id] = claim;
                     claimedPorts[planet.Id]++;
                     newMove.Ship.Claim = ClaimType.Expand;
+                    newMove.Ship.XPos = claim.NewPosition.XPos;
+                    newMove.Ship.YPos = claim.NewPosition.YPos;
                     CalculateMoves(sortedPlanets, map);
                 }
             }
@@ -203,8 +194,11 @@ namespace Halite2
                 planet = planetToAttack;
                 var newMove = NavigateToAttack(map, planet);
                 if (newMove != null) {
-                    claims[newMove.Ship.Id] = new Claim(planet.Id, ClaimType.Attack, newMove);
+                    var claim = new Claim(planet.Id, ClaimType.Attack, newMove);
+                    claims[newMove.Ship.Id] = claim;
                     newMove.Ship.Claim = ClaimType.Attack;
+                    newMove.Ship.XPos = claim.NewPosition.XPos;
+                    newMove.Ship.YPos = claim.NewPosition.YPos;
                     planet.Points -= planet.DockingSpots / newMove.Ship.GetDistanceTo(planet);
                     CalculateMoves(sortedPlanets, map);
                     break;
@@ -224,10 +218,8 @@ namespace Halite2
             if (ship.CanDock(planet)) {
                 return new DockMove(ship, planet);
             }
-            
-            var clockwise = ShouldGoClockwise(map, ship, planet);
 
-            return Navigation.NavigateShipToDock(map, ship, planet, Constants.MAX_SPEED, clockwise);
+            return Navigation.NavigateShipToDock(map, ship, planet, Constants.MAX_SPEED);
         }
 
         private static Move NavigateToAttack(GameMap map, Planet planet, Ship ship = null) {
@@ -252,10 +244,13 @@ namespace Halite2
             if (closestShipDistance < Constants.WEAPON_RADIUS / 2) {
                 return new Move(MoveType.Noop, ship);
             }
-            var clockwise = ShouldGoClockwise(map, ship, closestShip);
 
-            Move move = Navigation.NavigateShipTowardsTarget(map, ship, closestShip, Math.Min(Constants.MAX_SPEED, 
-                (int) Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS / 2, 1))), true, Constants.MAX_NAVIGATION_CORRECTIONS, Math.PI / 180.0 * (clockwise ? -1 : 1));
+            var move = Navigation.NavigateShipTowardsTarget(map, ship, closestShip, Math.Min(Constants.MAX_SPEED, 
+                (int) Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS / 2, 1))), true);
+
+            //if (ship.Health <= 127) {
+            //    move = new ThrustMove(move.Ship, move.Angle, Constants.MAX_SPEED);
+            //}
 
             // TODO: Don't stop, try to find a new target for this ship.
             if (move == null) {
@@ -295,44 +290,9 @@ namespace Halite2
                return new Move(MoveType.Noop, ship);
             }
             else {
-               var clockwise = ShouldGoClockwise(map, ship, closestShip);
-
                return Navigation.NavigateShipTowardsTarget(map, ship,
-                   closestShip, Math.Min(Constants.MAX_SPEED, (int) Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS / 2, 1))), true, Constants.MAX_NAVIGATION_CORRECTIONS,
-                   Math.PI / 180.0 * (clockwise ? -1 : 1));               
+                   closestShip, Math.Min(Constants.MAX_SPEED, (int) Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS / 2, 1))), true);               
             }
-        }
-
-        private static bool ShouldGoClockwise(GameMap map, Ship ship, Position target) {
-            var goLeft = false;
-
-            var obstacles = map.ObjectsBetween(ship, target);
-
-            if (obstacles.Any()) {
-                var pivot = obstacles.OrderBy(o => o.GetDistanceTo(ship)).First();
-                var shipToPivot = ship.GetDistanceTo(pivot);
-                var shipToTarget = ship.GetDistanceTo(target);
-                var targetToPivot = target.GetDistanceTo(pivot);
-
-                var B = Math.Acos(shipToTarget * shipToTarget + shipToPivot * shipToPivot - targetToPivot * targetToPivot) / (2 * shipToTarget * shipToPivot);
-
-                var A1 = Math.Asin(shipToPivot * Math.Sin(B) / pivot.Radius);
-                var A2 = Math.PI - A1;
-
-                var closePoint = new Position(pivot.Radius * Math.Cos(A1), pivot.Radius * Math.Sin(A1));
-                var farPoint = new Position(pivot.Radius * Math.Cos(A2), pivot.Radius * Math.Sin(A2));
-
-                var directionToShip = Math.Atan2(closePoint.YPos - pivot.YPos, closePoint.XPos - pivot.XPos);
-                var directionToTarget = Math.Atan2(farPoint.YPos - pivot.YPos, farPoint.XPos - pivot.XPos);
-
-                var angle = directionToShip - directionToTarget;
-                while (angle < 0) angle += 2 * Math.PI;
-                while (angle > 2 * Math.PI) angle -= 2 * Math.PI;
-
-                if (angle > Math.PI) goLeft = true;
-            }
-
-            return goLeft;
         }
     }
 }
