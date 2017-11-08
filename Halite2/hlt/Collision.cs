@@ -12,7 +12,7 @@ namespace Halite2.hlt
         /// <param name="circle">The circle to test against.</param>
         /// <param name="fudge">An additional safety zone to leave when looking for collisions. (Probably set it to ship radius 0.5)</param>
         /// <returns>true if the segment intersects, false otherwise</returns>
-        public static bool SegmentCircleIntersect(Position start, Position end, Entity circle, double fudge) {
+        public static double SegmentCircleIntersect(Position start, Position end, Entity circle, double fudge) {
             // Parameterize the segment as start + t * (end - start),
             // and substitute into the equation of a circle
             // Solve for t
@@ -35,20 +35,21 @@ namespace Halite2.hlt
 
             if (a == 0.0) {
                 // Start and end are the same point
-                return start.GetDistanceTo(circle) <= circleRadius + fudge;
+                return start.GetDistanceTo(circle) <= circleRadius + fudge ? 0 : -1;
             }
 
             // Time along segment when closest to the circle (vertex of the quadratic)
             double t = Math.Min(-b / (2 * a), 1.0);
             if (t < 0) {
-                return false;
+                return -1;
             }
 
             double closestX = startX + dx * t;
             double closestY = startY + dy * t;
-            double closestDistance = new Position(closestX, closestY).GetDistanceTo(circle);
+            var positionAtCollision = new Position(closestX, closestY);
+            double closestDistance = positionAtCollision.GetDistanceTo(circle);
 
-            return closestDistance <= circleRadius + fudge;
+            return closestDistance <= circleRadius + fudge ? closestDistance : -1;
         }
 
         public static double square(double num) { return num * num; }
