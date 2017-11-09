@@ -30,6 +30,7 @@ namespace Halite2
 
                     sortedPlanets.Clear();
                     moveList.Clear();
+                    Navigation.ClearState();
                     
                     var ownAnyPlanets = gameMap.AllPlanets.Any(p => p.Value.IsOwnedBy(gameMap.MyPlayerId));
 
