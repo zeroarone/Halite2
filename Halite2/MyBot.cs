@@ -91,17 +91,17 @@ namespace Halite2
                     claimsToRemove.Add(kvp.Key);
                 }
                 else {
+                    DebugLog.AddLog($"Stateful move: {ship.Id}:{claim}:{planet.Id}");
                     ship.Claim = claim.Type;
 
                     Move updatedMove = null;
                     switch (claim.Type) {
                         case ClaimType.Attack:
                             if (planet.IsOwned) {
-                                if(planet.Points > Constants.ATTACK_THRESHOLD || planets.All(p => p.Points <= Constants.ATTACK_THRESHOLD))
+                                if (planet.Points > Constants.ATTACK_THRESHOLD || planets.All(p => p.Points <= Constants.ATTACK_THRESHOLD)) {
                                     updatedMove = NavigateToAttack(map, planet, ship);
+                                }
                             }
-                            else
-                                claimsToRemove.Add(ship.Id);
                             break;
                         case ClaimType.Expand:
                             if (planet.IsOwned && planet.Owner != map.MyPlayerId) {
@@ -144,6 +144,7 @@ namespace Halite2
 
         private static void AvoidCollisions(){
             foreach(Claim claim in claims.Values){
+                DebugLog.AddLog($"{claim.PlanetId},{claim.Move.Ship.Id}, {claim.Type}");
                 moveList.Add(claim.Move);
             }
         }
@@ -190,11 +191,12 @@ namespace Halite2
                 }
             }
             //Attack
-            var attackPlanets = sortedPlanets.Where(p => p.IsOwned && !p.IsOwnedBy(map.MyPlayerId));
+            var attackPlanets = sortedPlanets.Where(p => p.IsOwned && !p.IsOwnedBy(map.MyPlayerId)).ToList();
             foreach(var planetToAttack in attackPlanets){
                 planet = planetToAttack;
                 var newMove = NavigateToAttack(map, planet);
                 if (newMove != null) {
+                    DebugLog.AddLog("Found move, attacking");
                     var claim = new Claim(planet.Id, ClaimType.Attack, newMove);
                     claims[newMove.Ship.Id] = claim;
                     newMove.Ship.Claim = ClaimType.Attack;
@@ -252,11 +254,6 @@ namespace Halite2
             //if (ship.Health <= 127) {
             //    move = new ThrustMove(move.Ship, move.Angle, Constants.MAX_SPEED);
             //}
-
-            // TODO: Don't stop, try to find a new target for this ship.
-            if (move == null) {
-                return null;
-            }
 
             return move;
         }
