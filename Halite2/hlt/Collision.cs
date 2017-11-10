@@ -49,7 +49,7 @@ namespace Halite2.hlt
             double closestY = startY + dy * t;
             var position = new Position(closestX, closestY);
             double closestDistance = position.GetDistanceTo(circle);
-            return closestDistance <= circleRadius + fudge ? start.GetDistanceTo(position) : -1;
+            return closestDistance <= circleRadius + fudge ? t : -1;
         }
 
         public static double square(double num) { return num * num; }
