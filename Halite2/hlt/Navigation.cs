@@ -24,21 +24,21 @@ namespace Halite2.hlt
                 var graph = new Graph();
                 shipObstaclesChecked[ship] = new HashSet<Entity>();
                 BuildGraph(gameMap, ship, ship, targetPos, graph, new Dictionary<Entity, int>());
-                DebugLog.AddLog("Graph:");
-                foreach (var keyValuePair in graph.vertices) {
-                    DebugLog.AddLog($"\t({keyValuePair.Key.XPos},{keyValuePair.Key.YPos})");
-                    foreach (var valuePair in keyValuePair.Value) {
-                        DebugLog.AddLog($"\t\t({valuePair.Key.XPos},{valuePair.Key.YPos})/{valuePair.Value}");
-                    }
-                }
-                DebugLog.AddLog($"Finding shortest path from ({ship.XPos},{ship.YPos}) to ({targetPos.XPos},{targetPos.YPos})");
+                //DebugLog.AddLog("Graph:");
+                //foreach (var keyValuePair in graph.vertices) {
+                //    DebugLog.AddLog($"\t({keyValuePair.Key.XPos},{keyValuePair.Key.YPos})");
+                //    foreach (var valuePair in keyValuePair.Value) {
+                //        DebugLog.AddLog($"\t\t({valuePair.Key.XPos},{valuePair.Key.YPos})/{valuePair.Value}");
+                //    }
+                //}
+                //DebugLog.AddLog($"Finding shortest path from ({ship.XPos},{ship.YPos}) to ({targetPos.XPos},{targetPos.YPos})");
                 try {
                     var shortestPath = graph.shortest_path(ship, targetPos);
 
                     shortestPath.Reverse();
-                    foreach (var position in shortestPath) {
-                        DebugLog.AddLog($"\t({position.XPos},{position.YPos})");
-                    }
+                    //foreach (var position in shortestPath) {
+                    //    DebugLog.AddLog($"\t({position.XPos},{position.YPos})");
+                    //}
                     var newTarget = shortestPath[0];
 
                     distance = ship.GetDistanceTo(newTarget);
@@ -52,7 +52,7 @@ namespace Halite2.hlt
                 distance = ship.GetDistanceTo(ship.GetClosestPoint(targetPos));
             }
 
-            distance = (int) Math.Floor(distance);
+            distance = (int) Math.Ceiling(distance);
 
             int thrust;
             if (distance < maxThrust)
@@ -66,14 +66,14 @@ namespace Halite2.hlt
         }
 
         private static void BuildGraph(GameMap gameMap, Ship ship, Ship startPosition, Position endPosition, Graph graph, Dictionary<Entity, int> entitiesCheckedThisRoute) {
-            DebugLog.AddLog($"Checking obstacles between (x - {startPosition.XPos})^2 + (y - {startPosition.YPos})^2 = {startPosition.Radius}^2 and (x - {endPosition.XPos})^2 +(y - {endPosition.YPos})^2 = {endPosition.Radius}^2");
+            //DebugLog.AddLog($"Checking obstacles between (x - {startPosition.XPos})^2 + (y - {startPosition.YPos})^2 = {startPosition.Radius}^2 and (x - {endPosition.XPos})^2 +(y - {endPosition.YPos})^2 = {endPosition.Radius}^2");
             var obstacles = gameMap.ObjectsBetween(startPosition, endPosition).OrderBy(o => o.Value).ToList();
             if (obstacles.Any()) {
                 var nearestObstacle = obstacles.First().Key;
-                DebugLog.AddLog($"Nearest obstacle:{nearestObstacle};");
-                DebugLog.AddLog($"Nearest obstacle:(x - {nearestObstacle.XPos})^2 + (y - {nearestObstacle.YPos})^2 = {nearestObstacle.Radius}^2;");
+                //DebugLog.AddLog($"Nearest obstacle:{nearestObstacle};");
+                //DebugLog.AddLog($"Nearest obstacle:(x - {nearestObstacle.XPos})^2 + (y - {nearestObstacle.YPos})^2 = {nearestObstacle.Radius}^2");
                 if (nearestObstacle == endPosition) {
-                    DebugLog.AddLog("True target found, adding final vertices.");
+                    //DebugLog.AddLog("True target found, adding final vertices.");
                     graph.add_vertex(startPosition, new Dictionary<Position, double> {{endPosition, startPosition.GetDistanceTo(endPosition)}});
                     graph.add_vertex(endPosition, new Dictionary<Position, double>());
                     return;
@@ -87,7 +87,7 @@ namespace Halite2.hlt
                     thisroute[nearestObstacle] = 1;
                 }
 
-                DebugLog.AddLog($"Tries{thisroute.Sum(e => e.Value)}");
+                //DebugLog.AddLog($"Tries{thisroute.Sum(e => e.Value)}");
                 if (thisroute.Sum(e => e.Value) > Constants.MAX_NAVIGATION_CORRECTIONS) {
                     // We've adjusted the route way too much along this path, stop here.
                     graph.add_vertex(startPosition, new Dictionary<Position, double>());
@@ -95,13 +95,13 @@ namespace Halite2.hlt
                 }
 
                 var tangents = GetTangents(startPosition, endPosition, nearestObstacle).Where(t => {
-                    return true;
                     var objectsBetweenShipAndTangent = gameMap.ObjectsBetween(startPosition, t).Any(t2 => t2.Key != nearestObstacle);
-                    if(objectsBetweenShipAndTangent)
-                        DebugLog.AddLog($"Objects between ship and tanget:(x - {t.XPos})^2 + (y - {t.YPos})^2 = {t.Radius*t.Radius}");
+                    //if(objectsBetweenShipAndTangent)
+                        //DebugLog.AddLog($"Objects between ship and tanget:(x - {t.XPos})^2 + (y - {t.YPos})^2 = {t.Radius*t.Radius}");
+                    //objectsBetweenShipAndTangent = objectsBetweenShipAndTangent && startPosition.GetDistanceTo(t) > 1;
                     return !objectsBetweenShipAndTangent;
                 }).ToList();
-                DebugLog.AddLog($"Adding shortest path for {startPosition}: {String.Join(",", tangents.Select(t => t.ToString()))}");
+                //DebugLog.AddLog($"Adding shortest path for {startPosition}: {String.Join(",", tangents.Select(t => t.ToString()))}");
                 graph.add_vertex(startPosition, tangents.ToDictionary(t => (Position)t, startPosition.GetDistanceTo));
 
                 foreach (var tangent in tangents) {
@@ -109,35 +109,42 @@ namespace Halite2.hlt
                 }
             }
             else {
-                DebugLog.AddLog("No obstacles found, adding final vertices.");
+                //DebugLog.AddLog("No obstacles found, adding final vertices.");
                 graph.add_vertex(startPosition, new Dictionary<Position, double> {{endPosition, startPosition.GetDistanceTo(endPosition)}});
                 graph.add_vertex(endPosition, new Dictionary<Position, double>());
             }
         }
 
         private static Ship[] GetTangents(Ship ship, Position target, Entity obstacle) {
-            var radii = obstacle.Radius + Constants.FORECAST_FUDGE_FACTOR;
+            var radii = obstacle.Radius + ship.Radius + .15;
             //DebugLog.AddLog($"Radii:{radii} Ship:{ship.Radius}, Obstacle:{obstacle.Radius}");
             var shipToObstacle = ship.GetDistanceTo(obstacle);
-            //DebugLog.AddLog($"Distance between centers: {distanceBetweenCenters}");
-            var shipToTangent = Math.Sqrt(radii*radii + shipToObstacle*shipToObstacle);
-            DebugLog.AddLog($"Ship to tangent: {shipToTangent}");
-            var shipAngleToTangent = Math.Asin(radii/shipToTangent);
+            //DebugLog.AddLog($"Distance between centers: {shipToObstacle}");
+            var shipToTangent = Math.Sqrt(shipToObstacle*shipToObstacle - radii*radii);
+            //DebugLog.AddLog($"Ship to tangent: {shipToTangent}");
+            var shipAngleFromCenterToTangent = Math.Asin(radii/shipToObstacle);
+            //DebugLog.AddLog($"Ship angle from center to tangent: {shipAngleFromCenterToTangent}");
             var shipAngleToObstacle = ship.OrientTowardsInRad(obstacle);
 
             var targetToObstacle = target.GetDistanceTo(obstacle);
-            var targetToTangent = Math.Sqrt(radii*radii + targetToObstacle*targetToObstacle);
-            var targetAngleToTangent = Math.Asin(radii/targetToTangent);
+            var targetToTangent = Math.Sqrt(targetToObstacle*targetToObstacle - radii*radii);
+            var targetAngleFromCenterToTangent = Math.Asin(radii/targetToObstacle);
             var targetAngleToObstacle = target.OrientTowardsInRad(obstacle);
 
-            var shipAngleRight = shipAngleToObstacle + shipAngleToTangent;
-            var shipAngleLeft = shipAngleToObstacle - shipAngleToTangent;
-            var targetAngleRight = targetAngleToObstacle - targetAngleToTangent;
-            var targetAngleLeft = targetAngleToObstacle + targetAngleToTangent;
+            if (double.IsNaN(shipToTangent) || double.IsNaN(targetToTangent)) {
+                return new Ship[0];
+            }
+
+            var shipAngleRight = shipAngleToObstacle + shipAngleFromCenterToTangent;
+            var shipAngleLeft = shipAngleToObstacle - shipAngleFromCenterToTangent;
+            //DebugLog.AddLog($"Ship angles: {shipAngleLeft} , {shipAngleRight}");
+
+            var targetAngleRight = targetAngleToObstacle - targetAngleFromCenterToTangent;
+            var targetAngleLeft = targetAngleToObstacle + targetAngleFromCenterToTangent;
             
-            DebugLog.AddLog($"Ship tangents:(x - {ship.XPos + shipToTangent * Math.Cos(shipAngleRight)})^2 + (y - {ship.YPos + shipToTangent * Math.Sin(shipAngleRight)})^2 = {ship.Radius}^2," +
-                            $"(x - {ship.XPos + shipToTangent * Math.Cos(shipAngleLeft)})^2 + (y - {ship.YPos + shipToTangent * Math.Sin(shipAngleLeft)})^2 = {ship.Radius}^2");
-            DebugLog.AddLog($"Obstacle tangents:(x - {target.XPos + targetToTangent * Math.Cos(targetAngleRight)})^2 + (y - {target.YPos + targetToTangent * Math.Sin(targetAngleRight)})^2 = {ship.Radius}^2,(x - {target.XPos + targetToTangent * Math.Cos(targetAngleLeft)})^2 + (y - {target.YPos + targetToTangent * Math.Sin(targetAngleLeft)})^2 = {ship.Radius}^2");
+            //DebugLog.AddLog($"Ship tangents:(x - {ship.XPos + shipToTangent * Math.Cos(shipAngleRight)})^2 + (y - {ship.YPos + shipToTangent * Math.Sin(shipAngleRight)})^2 = {ship.Radius}^2," +
+                            //$"(x - {ship.XPos + shipToTangent * Math.Cos(shipAngleLeft)})^2 + (y - {ship.YPos + shipToTangent * Math.Sin(shipAngleLeft)})^2 = {ship.Radius}^2");
+            //DebugLog.AddLog($"Obstacle tangents:(x - {target.XPos + targetToTangent * Math.Cos(targetAngleRight)})^2 + (y - {target.YPos + targetToTangent * Math.Sin(targetAngleRight)})^2 = {ship.Radius}^2,(x - {target.XPos + targetToTangent * Math.Cos(targetAngleLeft)})^2 + (y - {target.YPos + targetToTangent * Math.Sin(targetAngleLeft)})^2 = {ship.Radius}^2");
 
             var x11 = ship.XPos;
             var x12 = ship.XPos + shipToTangent * Math.Cos(shipAngleRight);
@@ -162,7 +169,7 @@ namespace Halite2.hlt
             var x = (B2*C1 - B1*C2)/det;
             var y = (A1*C2 - A2*C1)/det;
             
-            DebugLog.AddLog($"Finding intersection of ({x11},{y11}),({x12},{y12}) and ({x21},{y21}),({x22},{y22})");
+            //DebugLog.AddLog($"Finding intersection of ({x11},{y11}),({x12},{y12}) and ({x21},{y21}),({x22},{y22})");
             
             var point1 = new Ship(0, ship.Id, x, y, ship.Health, ship.DockingStatus, ship.DockedPlanet, ship.DockingProgress, ship.WeaponCooldown);
             
@@ -190,7 +197,7 @@ namespace Halite2.hlt
             y = (A1*C2 - A2*C1)/det;
 
             var point2 = new Ship(0, ship.Id, x, y, ship.Health, ship.DockingStatus, ship.DockedPlanet, ship.DockingProgress, ship.WeaponCooldown);
-            DebugLog.AddLog($"Found positions to bypass:((x - {point1.XPos})^2 + (y - {point1.YPos})^2 = {ship.Radius}^2, (x - {point2.XPos})^2 + (y - {point2.YPos})^2 = {ship.Radius}^2");
+            //DebugLog.AddLog($"Found positions to bypass:(x - {point1.XPos})^2 + (y - {point1.YPos})^2 = {ship.Radius}^2, (x - {point2.XPos})^2 + (y - {point2.YPos})^2 = {ship.Radius}^2");
 
             return new [] {point1, point2};
         }
