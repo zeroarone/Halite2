@@ -1,5 +1,4 @@
 using System;
-using System.Reflection.PortableExecutable;
 
 namespace Halite2.hlt
 {
