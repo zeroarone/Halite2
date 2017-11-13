@@ -76,7 +76,7 @@ namespace Halite2
                             }
                             planet.Attackers = enemyShips.Cast<Ship>().ToList();
                         }
-                        DebugLog.AddLog($"Planet {planet.Id}\r\tExpansion: {planet.ExpansionPoints}\r\tAttack: {planet.AttackPoints}");
+                        //DebugLog.AddLog($"Planet {planet.Id}\r\tExpansion: {planet.ExpansionPoints}\r\tAttack: {planet.AttackPoints}");
                     }
 
                     RunStatefulMoves(sortedPlanets, map, claimedPorts);
@@ -217,8 +217,6 @@ namespace Halite2
                     claims[newMove.Ship.Id] = claim;
                     claimedPorts[planet.Id]++;
                     newMove.Ship.Claim = ClaimType.Expand;
-                    claim.Move.Ship.XPos = claim.NewPosition.XPos;
-                    claim.Move.Ship.YPos = claim.NewPosition.YPos;
                     ExpansionMove(sortedPlanets, map);
                 }
             }
@@ -251,9 +249,7 @@ namespace Halite2
                 return new DockMove(ship, planet);
             }
 
-            var clockwise = ShouldGoClockwise(map, ship, planet);
-
-            return Navigation.NavigateShipToDock(map, ship, planet, Constants.MAX_SPEED, clockwise);
+            return Navigation.NavigateShipToDock(map, ship, planet, Constants.MAX_SPEED);
         }
 
         private static Move NavigateToAttack(GameMap map, Planet planet, Ship ship = null) {
@@ -278,10 +274,8 @@ namespace Halite2
             if (closestShipDistance < Constants.WEAPON_RADIUS / 2) {
                 return new Move(MoveType.Noop, ship);
             }
-            var clockwise = ShouldGoClockwise(map, ship, closestShip);
-
             Move move = Navigation.NavigateShipTowardsTarget(map, ship, closestShip, Math.Min(Constants.MAX_SPEED,
-                (int) Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS / 2, 1))), true, Constants.MAX_NAVIGATION_CORRECTIONS, Math.PI / 180.0 * (clockwise ? -1 : 1));
+                (int) Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS / 2, 1))), false);
 
             // TODO: Don't stop, try to find a new target for this ship.
             if (move == null) {
@@ -321,44 +315,8 @@ namespace Halite2
                 return new Move(MoveType.Noop, ship);
             }
             else {
-                var clockwise = ShouldGoClockwise(map, ship, closestShip);
-
-                return Navigation.NavigateShipTowardsTarget(map, ship,
-                    closestShip, Math.Min(Constants.MAX_SPEED, (int) Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS / 2, 1))), true, Constants.MAX_NAVIGATION_CORRECTIONS,
-                    Math.PI / 180.0 * (clockwise ? -1 : 1));
+                return Navigation.NavigateShipTowardsTarget(map, ship, closestShip, Math.Min(Constants.MAX_SPEED, (int) Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS / 2, 1))), false);
             }
-        }
-
-        private static bool ShouldGoClockwise(GameMap map, Ship ship, Position target) {
-            var goLeft = false;
-
-            var obstacles = map.ObjectsBetween(ship, target);
-
-            if (obstacles.Any()) {
-                var pivot = obstacles.OrderBy(o => o.GetDistanceTo(ship)).First();
-                var shipToPivot = ship.GetDistanceTo(pivot);
-                var shipToTarget = ship.GetDistanceTo(target);
-                var targetToPivot = target.GetDistanceTo(pivot);
-
-                var B = Math.Acos(shipToTarget * shipToTarget + shipToPivot * shipToPivot - targetToPivot * targetToPivot) / (2 * shipToTarget * shipToPivot);
-
-                var A1 = Math.Asin(shipToPivot * Math.Sin(B) / pivot.Radius);
-                var A2 = Math.PI - A1;
-
-                var closePoint = new Position(pivot.Radius * Math.Cos(A1), pivot.Radius * Math.Sin(A1));
-                var farPoint = new Position(pivot.Radius * Math.Cos(A2), pivot.Radius * Math.Sin(A2));
-
-                var directionToShip = Math.Atan2(closePoint.YPos - pivot.YPos, closePoint.XPos - pivot.XPos);
-                var directionToTarget = Math.Atan2(farPoint.YPos - pivot.YPos, farPoint.XPos - pivot.XPos);
-
-                var angle = directionToShip - directionToTarget;
-                while (angle < 0) angle += 2 * Math.PI;
-                while (angle > 2 * Math.PI) angle -= 2 * Math.PI;
-
-                if (angle > Math.PI) goLeft = true;
-            }
-
-            return goLeft;
         }
     }
 }

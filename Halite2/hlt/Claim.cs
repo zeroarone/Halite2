@@ -6,13 +6,13 @@ namespace Halite2
     public class Claim
     {
         private Move move;
-        private Position position;
-        private bool recalculatePosition;
 
         public Claim(int planetId, ClaimType type, Move move) {
             PlanetId = planetId;
             Type = type;
             Move = move;
+
+            CalculateNewPosition();
         }
         public int PlanetId { get; }
         public ClaimType Type { get; }
@@ -22,23 +22,16 @@ namespace Halite2
             } 
             set{
                 move = value;
-                recalculatePosition = true;
+                CalculateNewPosition();
             }
         }
-        public Position NewPosition{
-            get{
-                if(recalculatePosition){
-                    var thrustMove = Move as ThrustMove;
-                    if(thrustMove == null){
-                        position = Move.Ship;
-                    }
-                    else{
-                        var x = thrustMove.Thrust * Math.Cos(thrustMove.Angle * Math.PI/180);
-                        var y = thrustMove.Thrust * Math.Sin(thrustMove.Angle * Math.PI/180);
-                        position = new Position(Move.Ship.XPos + x, Move.Ship.YPos + y);
-                    }
-                }
-                return position;
+        private void  CalculateNewPosition(){
+            var thrustMove = Move as ThrustMove;
+            if(thrustMove != null){
+                DebugLog.AddLog($"PreviousPosition:(x - {Move.Ship.XPos})^2 + (y - {Move.Ship.YPos})^2 = {Move.Ship.Radius}^2");
+                Move.Ship.XPos += thrustMove.Thrust * Math.Cos(thrustMove.Angle * Math.PI/180);
+                Move.Ship.YPos += thrustMove.Thrust * Math.Sin(thrustMove.Angle * Math.PI/180);
+                DebugLog.AddLog($"NewPosition:(x - {Move.Ship.XPos})^2 + (y - {Move.Ship.YPos})^2 = {Move.Ship.Radius}^2");
             }
         }
     }
