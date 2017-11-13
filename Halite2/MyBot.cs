@@ -202,8 +202,8 @@ namespace Halite2
         
         private static void AttackMove(List<Planet> sortedPlanets, GameMap map) {
             sortedPlanets.Sort(AttackComparer);
-            var planet = sortedPlanets.FirstOrDefault(p => p.IsOwned && !p.IsOwnedBy(map.MyPlayerId));
-            if (planet != null) {
+            var attackPlanets = sortedPlanets.Where(p => p.IsOwned && !p.IsOwnedBy(map.MyPlayerId));
+            foreach (var planet in attackPlanets) {
                 var ship = planet.GetClosestUnclaimedShip(ClaimType.Attack);
                 if (ship != null) {
                     var newMove = NavigateToAttack(map, planet, ship);
@@ -211,8 +211,9 @@ namespace Halite2
                         claims[newMove.Ship.Id] = new Claim(planet.Id, ClaimType.Attack, newMove);
                         newMove.Ship.Claim = ClaimType.Attack;
                         planet.AttackPoints -= planet.DockingSpots / newMove.Ship.GetDistanceTo(planet);
+                        AttackMove(sortedPlanets, map);
+                        break;
                     }
-                    AttackMove(sortedPlanets, map);
                 }
             }
         }
@@ -234,8 +235,8 @@ namespace Halite2
                         claims[newMove.Ship.Id] = claim;
                         claimedPorts[planet.Id]++;
                         newMove.Ship.Claim = ClaimType.Expand;
-                    }
                     ExpansionMove(sortedPlanets, map);
+                    }
                 }
             }
         }
@@ -251,8 +252,8 @@ namespace Halite2
                         claims[newMove.Ship.Id] = claim;
                         //planet.AlterPoints(claim);
                         newMove.Ship.Claim = ClaimType.Defend;
-                    }
                     DefenseMove(sortedPlanets, map);
+                    }
                 }
             }
         }
@@ -290,14 +291,13 @@ namespace Halite2
             if (closestShipDistance < Constants.WEAPON_RADIUS / 2) {
                 return new Move(MoveType.Noop, ship);
             }
-            Move move = Navigation.NavigateShipTowardsTarget(map, ship, closestShip, Math.Min(Constants.MAX_SPEED,
-                (int) Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS / 2, 1))), false, false);
+            Move move  = Navigation.NavigateShipTowardsTarget(map, ship, ship.GetClosestPoint(closestShip), Math.Min(Constants.MAX_SPEED,
+                    (int)Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS / 2, 1))), false, false);
             
             if (move == null) {
-                move = Navigation.NavigateShipTowardsTarget(map, ship, closestShip, Math.Min(Constants.MAX_SPEED,
+                move = Navigation.NavigateShipTowardsTarget(map, ship, ship.GetClosestPoint(closestShip), Math.Min(Constants.MAX_SPEED,
                     (int)Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS / 2, 1))), false, true);
             }
-
             return move;
         }
 
