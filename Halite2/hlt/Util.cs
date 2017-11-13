@@ -122,18 +122,26 @@ namespace Halite2.hlt
         }
     }
 
-    public class LineSegment{
-        public Position first {get;set;}
-        public Position second {get;set;}
-        public LineSegment(Position first, Position second){
+    public class LineSegment
+    {
+        public Position first { get; set; }
+        public Position second { get; set; }
+
+        public LineSegment(Position first, Position second) {
             this.first = first;
             this.second = second;
         }
+
         public Position[] getBoundingBox() {
-        Position[] result = new Position[2];
-        result[0] = new Position(Math.Min(first.XPos, second.XPos), Math.Min(first.YPos, second.YPos));
-        result[1] = new Position(Math.Max(first.XPos, second.XPos), Math.Max(first.YPos, second.YPos));
-        return result;
-    }
+            Position[] result = new Position[2];
+            result[0] = new Position(Math.Min(first.XPos, second.XPos), Math.Min(first.YPos, second.YPos));
+            result[1] = new Position(Math.Max(first.XPos, second.XPos), Math.Max(first.YPos, second.YPos));
+            return result;
+        }
+
+        public override string ToString() {
+            var slope = (first.XPos - second.XPos) / (first.YPos - second.YPos);
+            return $"y - {first.YPos} = {slope}*(x - {first.XPos}) : ({first.XPos},{first.YPos}),({second.XPos},{second.YPos})";
+        }
     }
 }

@@ -149,6 +149,7 @@ namespace Halite2
                     }
 
                     if (updatedMove != null) {
+                        claim.OriginalPosition = new Position(ship.XPos, ship.YPos);
                         claim.Move = updatedMove;
                     }
                     else {
@@ -167,19 +168,21 @@ namespace Halite2
 
         private static void AvoidCollisions() {
             foreach (Claim claim in claims.Values) {
-                //if (claim.Move.Type == MoveType.Thrust && ((ThrustMove) claim.Move).Thrust > 0) {
-                //    var thrustMove = (ThrustMove) claim.Move;
-                //    foreach (var other in claims.Values.Where(c => c != claim)) {
-                //        var changed = false;
-                //        var newDistance = claim.NewPosition.GetDistanceTo(other.NewPosition);
-                //        while (Util.doLinesIntersect(new LineSegment(claim.Move.Ship, claim.NewPosition), new LineSegment(other.Move.Ship, other.NewPosition)) || newDistance < Constants.SHIP_RADIUS + Constants.FORECAST_FUDGE_FACTOR * 1.5 & thrustMove.Thrust > 1) {
-                //            changed = true;
-                //            thrustMove = new ThrustMove(thrustMove.Ship, thrustMove.Angle, thrustMove.Thrust - 1);
-                //            claim.Move = thrustMove;
-                //        }
-                //        if (changed) break;
-                //    }
-                //}
+                if (claim.Move.Type == MoveType.Thrust && ((ThrustMove)claim.Move).Thrust > 0) {
+                    var thrustMove = (ThrustMove)claim.Move;
+                    foreach (var other in claims.Values.Where(c => c != claim)) {
+                        var changed = false;
+                        while (Util.doLinesIntersect(new LineSegment(claim.Move.Ship, claim.OriginalPosition), new LineSegment(other.Move.Ship, other.OriginalPosition)) & thrustMove.Thrust > 0) {
+                            DebugLog.AddLog($"Lines intersect! ship {claim.Move.Ship.Id}");
+                            DebugLog.AddLog($"{new LineSegment(claim.Move.Ship, claim.OriginalPosition)}");
+                            DebugLog.AddLog($"{new LineSegment(other.Move.Ship, other.OriginalPosition)}");
+                            changed = true;
+                            thrustMove = new ThrustMove(thrustMove.Ship, thrustMove.Angle, thrustMove.Thrust - 1);
+                            claim.Move = thrustMove;
+                        }
+                        if (changed) break;
+                    }
+                }
                 moveList.Add(claim.Move);
             }
         }
