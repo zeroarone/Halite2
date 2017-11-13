@@ -55,7 +55,7 @@ namespace Halite2.hlt
         // Implementation-specific constants
 
         public static double FORECAST_FUDGE_FACTOR = SHIP_RADIUS + 0.1;
-        public static int MAX_NAVIGATION_CORRECTIONS = 20;
+        public static int MAX_NAVIGATION_CORRECTIONS = 10;
 
         /**
          * Used in Position.getClosestPoint()

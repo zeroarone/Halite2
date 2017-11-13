@@ -10,5 +10,7 @@ namespace Halite2.hlt
             Thrust = thrust;
             Angle = angleDeg;
         }
+
+        public override string ToString() { return $"ThrustMove: Thrust [{Thrust}] Angle [{Angle}]"; }
     }
 }

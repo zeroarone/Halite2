@@ -13,6 +13,7 @@ namespace Halite2.hlt
             this.DockedPlanet = dockedPlanet;
             this.DockingProgress = dockingProgress;
             this.WeaponCooldown = weaponCooldown;
+            OriginalPosition = new Position(xPos, yPos);
         }
 
         public int WeaponCooldown { get; }
@@ -24,6 +25,7 @@ namespace Halite2.hlt
         public int DockedPlanet { get; }
         
         public ClaimType Claim { get; set; }
+        public Position OriginalPosition { get; set; }
 
         public bool CanDock(Planet planet)
         {

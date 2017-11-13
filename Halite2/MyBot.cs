@@ -26,7 +26,7 @@ namespace Halite2
 
                 var step = 0;
                 while (true) {
-                    DebugLog.AddLog($"New Move: {step++}----------------------------------------------------------------------");
+                    DebugLog.AddLog($"New Move {step++}----------------------------------------------------------------------");
                     map.UpdateMap(Networking.ReadLineIntoMetadata());
 
                     sortedPlanets.Clear();
@@ -83,13 +83,16 @@ namespace Halite2
 
                     sortedPlanets.Sort(ExpansionComparer);
                     //Defend
+                    DebugLog.AddLog("Defending...");
                     DefenseMove(sortedPlanets, map);
 
                     //Counter interrupted docking is done in the stateful moves above.
                     //Expand
+                    DebugLog.AddLog("Expanding...");
                     ExpansionMove(sortedPlanets, map);
 
                     //Attack
+                    DebugLog.AddLog("Attacking...");
                     AttackMove(sortedPlanets, map);
                     AvoidCollisions();
 
@@ -149,7 +152,6 @@ namespace Halite2
                     }
 
                     if (updatedMove != null) {
-                        claim.OriginalPosition = new Position(ship.XPos, ship.YPos);
                         claim.Move = updatedMove;
                     }
                     else {
@@ -172,18 +174,26 @@ namespace Halite2
                     var thrustMove = (ThrustMove)claim.Move;
                     foreach (var other in claims.Values.Where(c => c != claim)) {
                         var changed = false;
-                        while (Util.doLinesIntersect(new LineSegment(claim.Move.Ship, claim.OriginalPosition), new LineSegment(other.Move.Ship, other.OriginalPosition)) & thrustMove.Thrust > 0) {
-                            DebugLog.AddLog($"Lines intersect! ship {claim.Move.Ship.Id}");
-                            DebugLog.AddLog($"{new LineSegment(claim.Move.Ship, claim.OriginalPosition)}");
-                            DebugLog.AddLog($"{new LineSegment(other.Move.Ship, other.OriginalPosition)}");
-                            changed = true;
-                            thrustMove = new ThrustMove(thrustMove.Ship, thrustMove.Angle, thrustMove.Thrust - 1);
-                            claim.Move = thrustMove;
+                        Position intersection;
+                        while (Util.FindIntersection(claim.Move.Ship, claim.Move.Ship.OriginalPosition, other.Move.Ship, other.Move.Ship.OriginalPosition, out intersection) & thrustMove.Thrust > 0) {
+                            //DebugLog.AddLog($"Lines intersect! ship {claim.Move.Ship.Id}");
+                            //DebugLog.AddLog($"{new LineSegment(claim.Move.Ship, claim.Move.Ship.OriginalPosition)}");
+                            //DebugLog.AddLog($"{new LineSegment(other.Move.Ship, other.Move.Ship.OriginalPosition)}");
+
+                            if (claim.Move.Ship.OriginalPosition.GetDistanceTo(intersection) >= other.Move.Ship.OriginalPosition.GetDistanceTo(intersection)) {
+                                changed = true;
+                                thrustMove = new ThrustMove(thrustMove.Ship, thrustMove.Angle, thrustMove.Thrust - 1);
+                                claim.Move = thrustMove;
+                            }
+                            else {
+                                break;
+                            }
                         }
                         if (changed) break;
                     }
                 }
                 moveList.Add(claim.Move);
+                //DebugLog.AddLog($"Adding move: Ship {claim.Move.Ship.Id}, {claim.Move} ");
             }
         }
 
@@ -191,16 +201,18 @@ namespace Halite2
         private static int AttackComparer(Planet p1, Planet p2) { return p2.AttackPoints.CompareTo(p1.AttackPoints); }
         
         private static void AttackMove(List<Planet> sortedPlanets, GameMap map) {
-            var attackPlanets = sortedPlanets.Where(p => p.IsOwned && !p.IsOwnedBy(map.MyPlayerId)).ToList();
-            attackPlanets.Sort(AttackComparer);
-            foreach (var planet in attackPlanets) {
-                var newMove = NavigateToAttack(map, planet);
-                if (newMove != null) {
-                    claims[newMove.Ship.Id] = new Claim(planet.Id, ClaimType.Attack, newMove);
-                    newMove.Ship.Claim = ClaimType.Attack;
-                    planet.AttackPoints -= planet.DockingSpots / newMove.Ship.GetDistanceTo(planet);
+            sortedPlanets.Sort(AttackComparer);
+            var planet = sortedPlanets.FirstOrDefault(p => p.IsOwned && !p.IsOwnedBy(map.MyPlayerId));
+            if (planet != null) {
+                var ship = planet.GetClosestUnclaimedShip(ClaimType.Attack);
+                if (ship != null) {
+                    var newMove = NavigateToAttack(map, planet, ship);
+                    if (newMove != null) {
+                        claims[newMove.Ship.Id] = new Claim(planet.Id, ClaimType.Attack, newMove);
+                        newMove.Ship.Claim = ClaimType.Attack;
+                        planet.AttackPoints -= planet.DockingSpots / newMove.Ship.GetDistanceTo(planet);
+                    }
                     AttackMove(sortedPlanets, map);
-                    break;
                 }
             }
         }
@@ -214,12 +226,15 @@ namespace Halite2
                 return unclaimedPorts > 0 && p.GetClosestUnclaimedShip(ClaimType.Expand) != null;
             });
             if (planet != null) {
-                var newMove = NavigateToDock(map, planet);
-                if (newMove != null) {
-                    var claim = new Claim(planet.Id, ClaimType.Expand, newMove);
-                    claims[newMove.Ship.Id] = claim;
-                    claimedPorts[planet.Id]++;
-                    newMove.Ship.Claim = ClaimType.Expand;
+                var ship = planet.GetClosestUnclaimedShip(ClaimType.Expand);
+                if (ship != null) {
+                    var newMove = NavigateToDock(map, planet, ship);
+                    if (newMove != null) {
+                        var claim = new Claim(planet.Id, ClaimType.Expand, newMove);
+                        claims[newMove.Ship.Id] = claim;
+                        claimedPorts[planet.Id]++;
+                        newMove.Ship.Claim = ClaimType.Expand;
+                    }
                     ExpansionMove(sortedPlanets, map);
                 }
             }
@@ -228,23 +243,22 @@ namespace Halite2
         private static void DefenseMove(List<Planet> sortedPlanets, GameMap map) {
             var planet = sortedPlanets.FirstOrDefault(p => p.Attackers.Count > p.Defenders / 2);
             if (planet != null) {
-                var newMove = NavigateToDefend(map, planet);
-                if (newMove != null) {
-                    var claim = new Claim(planet.Id, ClaimType.Defend, newMove);
-                    claims[newMove.Ship.Id] = claim;
-                    //planet.AlterPoints(claim);
-                    newMove.Ship.Claim = ClaimType.Defend;
+                var ship = planet.GetClosestUnclaimedShip(ClaimType.Defend);
+                if (ship != null) {
+                    var newMove = NavigateToDefend(map, planet, ship);
+                    if (newMove != null) {
+                        var claim = new Claim(planet.Id, ClaimType.Defend, newMove);
+                        claims[newMove.Ship.Id] = claim;
+                        //planet.AlterPoints(claim);
+                        newMove.Ship.Claim = ClaimType.Defend;
+                    }
                     DefenseMove(sortedPlanets, map);
                 }
             }
         }
 
-        private static Move NavigateToDock(GameMap map, Planet planet, Ship ship = null) {
-            if (ship == null)
-                ship = planet.GetClosestUnclaimedShip(ClaimType.Expand);
-
-            if (ship == null)
-                return null;
+        private static Move NavigateToDock(GameMap map, Planet planet, Ship ship) {
+            planet.PreventUsFromGettingAlreadyTriedShip(ship.Id);
 
             DebugLog.AddLog($"Docking planet {planet.Id} with ship {ship.Id}");
 
@@ -252,15 +266,14 @@ namespace Halite2
                 return new DockMove(ship, planet);
             }
 
-            return Navigation.NavigateShipToDock(map, ship, planet, Constants.MAX_SPEED);
+            var move = Navigation.NavigateShipToDock(map, ship, planet, Constants.MAX_SPEED, false);
+            if(move == null)
+                move = Navigation.NavigateShipToDock(map, ship, planet, Constants.MAX_SPEED, true);
+            return move;
         }
 
-        private static Move NavigateToAttack(GameMap map, Planet planet, Ship ship = null) {
-            if (ship == null)
-                ship = planet.GetClosestUnclaimedShip(ClaimType.Attack);
-
-            if (ship == null)
-                return null;
+        private static Move NavigateToAttack(GameMap map, Planet planet, Ship ship) {
+            planet.PreventUsFromGettingAlreadyTriedShip(ship.Id);
 
             DebugLog.AddLog($"Attacking planet {planet.Id} with ship {ship.Id}");
 
@@ -278,22 +291,18 @@ namespace Halite2
                 return new Move(MoveType.Noop, ship);
             }
             Move move = Navigation.NavigateShipTowardsTarget(map, ship, closestShip, Math.Min(Constants.MAX_SPEED,
-                (int) Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS / 2, 1))), false);
-
-            // TODO: Don't stop, try to find a new target for this ship.
+                (int) Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS / 2, 1))), false, false);
+            
             if (move == null) {
-                return null;
+                move = Navigation.NavigateShipTowardsTarget(map, ship, closestShip, Math.Min(Constants.MAX_SPEED,
+                    (int)Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS / 2, 1))), false, true);
             }
 
             return move;
         }
 
-        private static Move NavigateToDefend(GameMap map, Planet planet, Ship ship = null) {
-            if (ship == null)
-                ship = planet.GetClosestUnclaimedShip(ClaimType.Defend);
-
-            if (ship == null)
-                return null;
+        private static Move NavigateToDefend(GameMap map, Planet planet, Ship ship) {
+            planet.PreventUsFromGettingAlreadyTriedShip(ship.Id);
 
             DebugLog.AddLog($"Defending planet {planet.Id} with ship {ship.Id}");
 
@@ -318,7 +327,10 @@ namespace Halite2
                 return new Move(MoveType.Noop, ship);
             }
             else {
-                return Navigation.NavigateShipTowardsTarget(map, ship, closestShip, Math.Min(Constants.MAX_SPEED, (int) Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS / 2, 1))), false);
+                var move = Navigation.NavigateShipTowardsTarget(map, ship, closestShip, Math.Min(Constants.MAX_SPEED, (int) Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS / 2, 1))), false, false);
+                if(move == null)
+                    move = Navigation.NavigateShipTowardsTarget(map, ship, closestShip, Math.Min(Constants.MAX_SPEED, (int)Math.Floor(Math.Max(closestShipDistance - Constants.WEAPON_RADIUS / 2, 1))), false, true);
+                return move;
             }
         }
     }

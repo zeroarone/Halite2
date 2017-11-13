@@ -19,6 +19,7 @@ namespace Halite2.hlt
         public int Defenders {get;set;}
         public int FramesToNextSpawn => DockedShips.Count == 0 ? Int32.MaxValue : (int)Math.Ceiling(((double)Constants.RESOURCES_FOR_SHIP_PRODUCTION - CurrentProduction) / (Constants.BASE_PRODUCTIVITY * DockedShips.Count));
         public int FramesToLive { get; set; }
+        private HashSet<int> shipSet = new HashSet<int>();
 
         public Planet(int owner, int id, double xPos, double yPos, int health,
             double radius, int dockingSpots, int currentProduction,
@@ -31,6 +32,8 @@ namespace Halite2.hlt
             Attackers = new List<Ship>();
         }
 
+        public void PreventUsFromGettingAlreadyTriedShip(int shipId) { shipSet.Add(shipId); }
+
         public Ship GetClosestUnclaimedShip(ClaimType claimType) {
             var shipWithDistance = GetClosestUnclaimedShipAndDistance(claimType);
             if (shipWithDistance.Value == 0) return null;
@@ -40,6 +43,8 @@ namespace Halite2.hlt
         private KeyValuePair<Entity, double> GetClosestUnclaimedShipAndDistance(ClaimType claimType) {
             return ShipsByDistance.FirstOrDefault(s => {
                 var ship = (Ship) s.Key;
+                if (shipSet.Contains(ship.Id))
+                    return false;
                 if (claimType == ClaimType.Expand) {
                     if(ship.Health <= Constants.DOCKING_SHIP_HEALTH)
                         return false;
